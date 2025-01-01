@@ -1,0 +1,6 @@
+.DS_Store
+vendor
+coverage.out
+coverage.html
+.idea
+dist

@@ -1,0 +1,10 @@
+log_file_path: data-tools.log
+debug: false
+batch_size: 1000
+max_concurrent_file_operations: 10
+
+file_names_to_ignore:
+  - .DS_Store
+
+#folder_names_to_ignore:
+#  - .stversions
