@@ -1,8 +1,8 @@
 package main
 
 import (
-	"data-tools-2025/config"
-	"data-tools-2025/utils"
+	"data-tools/config"
+	"data-tools/utils"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -19,7 +19,7 @@ var AppVersion = "0.0"
 var usageText = "Usage: go run main.go [db path]"
 
 func main() {
-	print(fmt.Sprintf("Data Tools 2025 version %s\n", AppVersion))
+	print(fmt.Sprintf("Data Tools version %s\n", AppVersion))
 
 	c, err := config.Load(defaultConfigData)
 

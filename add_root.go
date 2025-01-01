@@ -1,8 +1,8 @@
 package main
 
 import (
-	"data-tools-2025/models"
-	"data-tools-2025/utils"
+	"data-tools/models"
+	"data-tools/utils"
 	"errors"
 	"gorm.io/gorm"
 	"path/filepath"

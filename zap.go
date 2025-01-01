@@ -1,8 +1,8 @@
 package main
 
 import (
-	"data-tools-2025/models"
-	"data-tools-2025/utils"
+	"data-tools/models"
+	"data-tools/utils"
 	"encoding/hex"
 	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/dustin/go-humanize"

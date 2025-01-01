@@ -1,4 +1,4 @@
-module data-tools-2025
+module data-tools
 
 go 1.23.4
 

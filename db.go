@@ -1,8 +1,8 @@
 package main
 
 import (
-	"data-tools-2025/config"
-	"data-tools-2025/models"
+	"data-tools/config"
+	"data-tools/models"
 	"fmt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

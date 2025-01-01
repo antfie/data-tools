@@ -1,4 +1,4 @@
-# Data Tools 2025
+# Data Tools
 
 Disclaimer: I will not be responsible for any data loss caused by this tool.
 

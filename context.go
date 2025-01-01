@@ -1,7 +1,7 @@
 package main
 
 import (
-	"data-tools-2025/config"
+	"data-tools/config"
 	"gorm.io/gorm"
 )
 
