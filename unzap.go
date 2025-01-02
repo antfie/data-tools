@@ -18,7 +18,7 @@ func (ctx *Context) UnZap(sourcePath, outputPath string) error {
 	_, err := os.Stat(outputPath)
 
 	// We expect the output directory to be empty
-	if err != nil || !errors.Is(err, os.ErrNotExist) {
+	if err == nil || !errors.Is(err, os.ErrNotExist) {
 		return ErrDestinationPathNotEmpty
 	}
 
@@ -77,11 +77,9 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 		orchestrator := utils.NewTaskOrchestrator(bar, len(fileHashesToUnZap), ctx.Config.MaxConcurrentFileOperations)
 
-		zapSourcePath := path.Join(sourcePath, zapFolderName)
-
 		for _, fileHash := range fileHashesToUnZap {
 			orchestrator.StartTask()
-			go ctx.unZapFile(orchestrator, &processedFileIds, zapSourcePath, destinationAbsolutePath, &fileHash, &notFoundFileIDs)
+			go ctx.unZapFile(orchestrator, &processedFileIds, sourcePath, destinationAbsolutePath, &fileHash, &notFoundFileIDs)
 		}
 
 		orchestrator.WaitForTasks()
@@ -97,8 +95,11 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 }
 
 func (ctx *Context) unZapFile(orchestrator *utils.TaskOrchestrator, processedFileIds *[]uint, zapSourcePath, destinationAbsolutePath string, file *ZapResult, notFoundFileIDs *[]uint) {
+	hexFileName := hex.EncodeToString(base58.Decode(file.Hash))
+	sourceFilePath := path.Join(zapSourcePath, hexFileName)
+
 	// If the file does not exist we can ignore it
-	if !IsFile(zapSourcePath) {
+	if !IsFile(sourceFilePath) {
 		orchestrator.Lock()
 		log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
 		*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
@@ -108,19 +109,17 @@ func (ctx *Context) unZapFile(orchestrator *utils.TaskOrchestrator, processedFil
 		return
 	}
 
-	destinationPath := path.Join(destinationAbsolutePath, file.AbsolutePath)
+	destinationFilePath := path.Join(destinationAbsolutePath, file.AbsolutePath)
 
 	// Make the destination directory if required
-	err := os.MkdirAll(path.Dir(destinationPath), 0700)
+	err := os.MkdirAll(path.Dir(destinationFilePath), 0700)
 
 	if err != nil {
 		log.Panic(err)
 	}
 
-	hexFileName := hex.EncodeToString(base58.Decode(file.Hash))
-
 	// un-ZAP
-	err = CopyOrMoveFile(path.Join(zapSourcePath, hexFileName), destinationPath, false)
+	err = CopyOrMoveFile(sourceFilePath, destinationFilePath, false)
 
 	if err != nil {
 		log.Panic(err)

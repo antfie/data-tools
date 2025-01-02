@@ -12,8 +12,6 @@ import (
 	"path"
 )
 
-const zapFolderName = "ZAP"
-
 type ZapResult struct {
 	FileHashID   uint
 	Hash         string
@@ -48,8 +46,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 	percentage := (float64(info.TotalFileSize-info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
 	utils.ConsoleAndLogPrintf("ZAPing %s (%.2f%%) of %s", humanize.Bytes(info.TotalFileSize-info.UniqueHashTotalFileSize), percentage, humanize.Bytes(info.TotalFileSize))
 
-	zapBasePath := path.Join(outputPath, zapFolderName)
-	err := os.MkdirAll(zapBasePath, 0700)
+	err := os.MkdirAll(outputPath, 0700)
 
 	if err != nil {
 		return err
@@ -90,7 +87,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 		for _, fileHash := range fileHashesToZap {
 			orchestrator.StartTask()
-			go ctx.zapFile(orchestrator, safeMode, zapBasePath, fileHash, &notFoundFileIDs)
+			go ctx.zapFile(orchestrator, safeMode, outputPath, fileHash, &notFoundFileIDs)
 		}
 
 		orchestrator.WaitForTasks()
