@@ -4,9 +4,10 @@ import (
 	"data-tools/config"
 	"data-tools/utils"
 	_ "embed"
+	"fmt"
 	"github.com/dustin/go-humanize"
 	"log"
-	"strings"
+	"math"
 	"time"
 )
 
@@ -49,42 +50,49 @@ func main() {
 	//	log.Fatal(err)
 	//}
 	//
-	//err = ctx.Crawl()
+	err = ctx.Crawl()
 
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
 
-	//err = ctx.HashFiles()
+	err = ctx.HashFiles()
 
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
 	//
-	//err = ctx.SizeFiles()
+	err = ctx.SizeFiles()
 	//
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
 	//
-	//err = ctx.TypeFiles()
+	err = ctx.TypeFiles()
 	//
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
 	//
-	//err = ctx.Zap("foo_output", true)
+	err = ctx.Zap("foo_output", true)
 	//
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
 	//
-	//err = ctx.UnZap("foo_output", "bob")
+	err = ctx.UnZap("foo_output", "bob")
 	//
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	utils.ConsoleAndLogPrintf("Finished in %s", strings.TrimSuffix(humanize.Time(startTime), " ago"))
+	duration := math.Round(time.Since(startTime).Seconds())
+	formattedDuration := fmt.Sprintf("%.0f second", duration)
+
+	if duration != 1 {
+		formattedDuration += "s"
+	}
+
+	utils.ConsoleAndLogPrintf("Finished in %s", formattedDuration)
 }
