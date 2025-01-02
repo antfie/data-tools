@@ -15,7 +15,7 @@ func SetupLogger(filePath string) error {
 	}
 
 	log.SetOutput(logFile)
-	log.SetFlags(log.LUTC)
+	log.SetFlags(log.LstdFlags | log.LUTC)
 	return nil
 }
 

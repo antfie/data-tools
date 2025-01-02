@@ -9,12 +9,12 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func initDb(config *config.Config, dbPath string) *gorm.DB {
+func initDb(config *config.Config) *gorm.DB {
 	gormConfig := &gorm.Config{
 		Logger: logger.Default.LogMode(getLogLevel(config)),
 	}
 
-	return connect(dbPath, gormConfig)
+	return connect(config.DBPath, gormConfig)
 }
 
 func getLogLevel(config *config.Config) logger.LogLevel {
@@ -152,7 +152,7 @@ LIMIT 		?
 `, fileAbsolutePathCTEQuery)
 }
 
-func QueryGetZappedFileHashesToUnzapWithLimit() string {
+func QueryGetZappedFileHashesToUnZapWithLimit() string {
 	return fmt.Sprintf(`
 SELECT		f.id,
       		fh.hash,

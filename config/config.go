@@ -8,16 +8,18 @@ import (
 )
 
 type yamlConfig struct {
-	LogFilePath                 string   `yaml:"log_file_path"`
 	IsDebug                     bool     `yaml:"debug"`
+	DBPath                      string   `yaml:"db_path"`
+	LogFilePath                 string   `yaml:"log_file_path"`
 	BatchSize                   int64    `yaml:"batch_size"`
 	MaxConcurrentFileOperations int64    `yaml:"max_concurrent_file_operations"`
 	FileNamesToIgnore           []string `yaml:"file_names_to_ignore"`
 	FolderNamesToIgnore         []string `yaml:"folder_names_to_ignore"`
 }
 type Config struct {
-	LogFilePath                 string
 	IsDebug                     bool
+	DBPath                      string
+	LogFilePath                 string
 	BatchSize                   int64
 	MaxConcurrentFileOperations int64
 	FileNamesToIgnore           []string
@@ -56,8 +58,9 @@ func parseConfigFile(configFilePath string) (*Config, error) {
 	}
 
 	return &Config{
-		LogFilePath:                 config.LogFilePath,
 		IsDebug:                     config.IsDebug,
+		DBPath:                      config.DBPath,
+		LogFilePath:                 config.LogFilePath,
 		BatchSize:                   config.BatchSize,
 		MaxConcurrentFileOperations: config.MaxConcurrentFileOperations,
 		FileNamesToIgnore:           config.FileNamesToIgnore,

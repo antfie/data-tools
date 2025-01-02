@@ -13,7 +13,7 @@ import (
 
 func (ctx *Context) Crawl() error {
 	var rootPaths []models.Path
-	result := ctx.DB.Where("child_path_count IS NULL AND ignored = 0").Find(&rootPaths)
+	result := ctx.DB.Where("child_path_count IS NULL AND deleted_at IS NULL AND level = 0 AND ignored = 0").Find(&rootPaths)
 
 	if result.Error != nil {
 		return nil

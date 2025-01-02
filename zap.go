@@ -157,7 +157,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 	// Do batches until there are no more
 	for {
 		var fileHashesToUnZap []ZapResult
-		result = ctx.DB.Raw(QueryGetZappedFileHashesToUnzapWithLimit(), processedFileIds, ctx.Config.BatchSize).Scan(&fileHashesToUnZap)
+		result = ctx.DB.Raw(QueryGetZappedFileHashesToUnZapWithLimit(), processedFileIds, ctx.Config.BatchSize).Scan(&fileHashesToUnZap)
 
 		if result.Error != nil {
 			return result.Error
