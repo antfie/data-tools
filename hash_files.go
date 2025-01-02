@@ -12,7 +12,7 @@ import (
 
 func (ctx *Context) HashFiles() error {
 	var count int64 = 0
-	result := ctx.DB.Model(&models.File{}).Where("file_hash_id IS NULL AND ignored = 0").Count(&count)
+	result := ctx.DB.Model(&models.File{}).Where("deleted_at IS NULL AND file_hash_id IS NULL AND ignored = 0").Count(&count)
 
 	if result.Error != nil {
 		return result.Error

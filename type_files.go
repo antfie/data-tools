@@ -101,8 +101,9 @@ func (ctx *Context) TypeFiles() error {
 			SET file_type_id = fh.file_type_id
 			FROM file_hashes fh
 			WHERE files.file_hash_id = fh.id
+			AND fh.file_type_id IS NOT NULL
 			AND fh.ignored = 0
-			AND files.file_hash_id IS NULL
+			AND files.file_type_id IS NULL
 			AND files.deleted_at IS NULL
 			AND files.ignored = 0`)
 

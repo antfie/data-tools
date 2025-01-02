@@ -70,12 +70,16 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 		// Have we finished?
 		if fileHashesToZap == nil {
-			// Update the file sizes from the file hash sizes
+			// Update the file zap status from the file hash zap status
 			result = ctx.DB.Exec(`UPDATE files
 			SET zapped = 1
 			FROM file_hashes fh
 			WHERE files.file_hash_id = fh.id
-			AND	fh.zapped = 1`)
+			AND	fh.zapped = 1
+		  	AND fh.ignored = 0
+			AND	files.zapped = 0
+			AND files.deleted_at IS NULL
+			AND files.ignored = 0`)
 
 			return result.Error
 		}

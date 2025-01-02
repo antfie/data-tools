@@ -4,6 +4,7 @@ import (
 	"data-tools/models"
 	"data-tools/utils"
 	"errors"
+	"github.com/dustin/go-humanize"
 	"github.com/schollz/progressbar/v3"
 	"log"
 	"os"
@@ -38,6 +39,9 @@ func (ctx *Context) SizeFiles() error {
 
 	bar := progressbar.Default(count)
 
+	totalFilesSized := int64(0)
+	totalFileSize := uint(0)
+
 	// Do batches until there are no more
 	for {
 		var fileHashesToSize []FileHashAndFile
@@ -49,6 +53,10 @@ func (ctx *Context) SizeFiles() error {
 
 		// Have we finished?
 		if fileHashesToSize == nil {
+			if totalFilesSized > 0 {
+				log.Printf("Sized %s totalling: %s", utils.Pluralize("file", totalFilesSized), humanize.Bytes(uint64(totalFileSize)))
+			}
+
 			return nil
 		}
 
@@ -58,7 +66,7 @@ func (ctx *Context) SizeFiles() error {
 
 		for _, fileHash := range fileHashesToSize {
 			orchestrator.StartTask()
-			go ctx.sizeFile(orchestrator, fileHash, &notFoundFileIDs)
+			go ctx.sizeFile(orchestrator, fileHash, &notFoundFileIDs, &totalFilesSized, &totalFileSize)
 		}
 
 		orchestrator.WaitForTasks()
@@ -88,7 +96,7 @@ func (ctx *Context) SizeFiles() error {
 	}
 }
 
-func (ctx *Context) sizeFile(orchestrator *utils.TaskOrchestrator, file FileHashAndFile, notFoundFileIDs *[]uint) {
+func (ctx *Context) sizeFile(orchestrator *utils.TaskOrchestrator, file FileHashAndFile, notFoundFileIDs *[]uint, totalFilesSized *int64, totalFileSize *uint) {
 	info, err := os.Stat(file.AbsolutePath)
 
 	if err != nil {
@@ -122,6 +130,11 @@ func (ctx *Context) sizeFile(orchestrator *utils.TaskOrchestrator, file FileHash
 	if result.Error != nil {
 		log.Fatalf("DB Error: %v", result.Error)
 	}
+
+	orchestrator.Lock()
+	*totalFilesSized++
+	*totalFileSize += formattedSize
+	orchestrator.Unlock()
 
 	orchestrator.FinishTask()
 }
