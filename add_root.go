@@ -33,6 +33,7 @@ func (ctx *Context) AddRootPath(rootPath string) error {
 
 	// Has the path already been added?
 	if result.RowsAffected > 0 {
+		utils.ConsoleAndLogPrintf("Root path \"%s\" has already been added.", absoluteRootPath)
 		return ErrPathAlreadyAdded
 	}
 

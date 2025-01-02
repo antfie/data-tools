@@ -8,5 +8,5 @@ var (
 	ErrCouldNotResolveHash                 = errors.New("could not resolve hash")
 	ErrCouldNotResolveFileType             = errors.New("could not resolve file type")
 	ErrNotOverwritingExistingDifferentFile = errors.New("not overwriting existing (different) file")
-	ErrFilesystemIsCaseInsensitive         = errors.New("the file system is case insensitive")
+	ErrDestinationPathNotEmpty             = errors.New("the destination path is not empty")
 )

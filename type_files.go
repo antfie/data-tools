@@ -23,13 +23,13 @@ func (ctx *Context) TypeFiles() error {
 		return nil
 	}
 
-	utils.ConsoleAndLogPrintf("Typing %s with %s in batches of %d", utils.Pluralize("file", count), utils.Pluralize("thread", ctx.Config.MaxConcurrentFileOperations), ctx.Config.BatchSize)
+	utils.ConsoleAndLogPrintf("Typing %s", utils.Pluralize("file", count))
 
 	bar := progressbar.Default(count)
 
 	// Do batches until there are no more
 	for {
-		var fileHashesToType []FileIdAndPath
+		var fileHashesToType []FileHashAndFile
 		result = ctx.DB.Raw(QueryUnTypedFileHashesWithLimit(), ctx.Config.BatchSize).Scan(&fileHashesToType)
 
 		if result.Error != nil {
@@ -38,24 +38,18 @@ func (ctx *Context) TypeFiles() error {
 
 		// Have we finished?
 		if fileHashesToType == nil {
-
-			// Update the file types from the file hash types
-			result = ctx.DB.Exec(`UPDATE files
-			SET file_type_id = fh.file_type_id
-			FROM file_hashes fh
-			WHERE files.file_hash_id = fh.id`)
-
-			return result.Error
+			return nil
 		}
 
 		fileHashTypeMap := make(map[string][]uint, len(fileHashesToType))
 		var uniqueFileTypes []string
+		var notFoundFileIDs []uint
 
 		orchestrator := utils.NewTaskOrchestrator(bar, len(fileHashesToType), ctx.Config.MaxConcurrentFileOperations)
 
 		for _, fileHash := range fileHashesToType {
 			orchestrator.StartTask()
-			go typeFile(orchestrator, fileHash, fileHashTypeMap, &uniqueFileTypes)
+			go typeFile(orchestrator, fileHash, fileHashTypeMap, &uniqueFileTypes, &notFoundFileIDs)
 		}
 
 		orchestrator.WaitForTasks()
@@ -101,14 +95,47 @@ func (ctx *Context) TypeFiles() error {
 				return result.Error
 			}
 		}
+
+		// Update the file types from the file hash types
+		result = ctx.DB.Exec(`UPDATE files
+			SET file_type_id = fh.file_type_id
+			FROM file_hashes fh
+			WHERE files.file_hash_id = fh.id
+			AND fh.ignored = 0
+			AND files.file_hash_id IS NULL
+			AND files.deleted_at IS NULL
+			AND files.ignored = 0`)
+
+		if result.Error != nil {
+			return result.Error
+		}
+
+		if len(notFoundFileIDs) > 0 {
+			result = ctx.DB.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+
+			if result.Error != nil {
+				return result.Error
+			}
+		}
 	}
 }
 
-func typeFile(orchestrator *utils.TaskOrchestrator, fileHashToType FileIdAndPath, fileHashTypeMap map[string][]uint, uniqueFileTypes *[]string) {
-	fileType, err := GetTypeOfFile(fileHashToType.AbsolutePath)
+func typeFile(orchestrator *utils.TaskOrchestrator, file FileHashAndFile, fileHashTypeMap map[string][]uint, uniqueFileTypes *[]string, notFoundFileIDs *[]uint) {
+	// If the file does not exist we can ignore it
+	if !IsFile(file.AbsolutePath) {
+		orchestrator.Lock()
+		log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
+		*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
+		orchestrator.Unlock()
+
+		orchestrator.FinishTask()
+		return
+	}
+
+	fileType, err := GetTypeOfFile(file.AbsolutePath)
 
 	if err != nil {
-		log.Fatalf("Could not type file \"%s\": %v", fileHashToType.AbsolutePath, err)
+		log.Fatalf("Could not type file \"%s\": %v", file.AbsolutePath, err)
 	}
 
 	// Maps are not threadsafe
@@ -116,10 +143,10 @@ func typeFile(orchestrator *utils.TaskOrchestrator, fileHashToType FileIdAndPath
 	existingFileHashIdsWithThisType, found := fileHashTypeMap[fileType]
 
 	if !found {
-		fileHashTypeMap[fileType] = []uint{fileHashToType.ID}
+		fileHashTypeMap[fileType] = []uint{file.FileID}
 		*uniqueFileTypes = append(*uniqueFileTypes, fileType)
 	} else {
-		fileHashTypeMap[fileType] = append(existingFileHashIdsWithThisType, fileHashToType.ID)
+		fileHashTypeMap[fileType] = append(existingFileHashIdsWithThisType, file.FileID)
 	}
 	orchestrator.Unlock()
 

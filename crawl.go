@@ -50,7 +50,11 @@ func (ctx *Context) crawlRootPath(rootPath models.Path) error {
 	currentLevel := uint(0)
 	px := map[string]*models.Path{rootPath.Name: &rootPath}
 
-	return filepath.WalkDir(rootPath.Name, func(p string, d fs.DirEntry, err error) error {
+	log.Printf("Crawling \"%s\"", rootPath.Name)
+	pathCount := int64(0)
+	fileCount := int64(0)
+
+	err := filepath.WalkDir(rootPath.Name, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -85,6 +89,8 @@ func (ctx *Context) crawlRootPath(rootPath models.Path) error {
 			if result.Error != nil {
 				return result.Error
 			}
+
+			pathCount++
 		} else {
 			if utils.IsInArray(d.Name(), ctx.Config.FileNamesToIgnore) {
 				return nil
@@ -99,10 +105,18 @@ func (ctx *Context) crawlRootPath(rootPath models.Path) error {
 			if result.Error != nil {
 				return result.Error
 			}
+
+			fileCount++
 		}
 
 		return nil
 	})
+
+	if err == nil {
+		log.Printf("Found %s and %s", utils.Pluralize("path", pathCount), utils.Pluralize("file", fileCount))
+	}
+
+	return err
 }
 
 func getSeparatorCount(path string) int {

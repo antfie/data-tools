@@ -9,8 +9,14 @@ import (
 	"os"
 )
 
+type FileHashAndFile struct {
+	FileHashID   uint
+	FileID       uint
+	AbsolutePath string
+}
+
 type FileIdAndPath struct {
-	ID           uint
+	FileID       uint
 	AbsolutePath string
 }
 
@@ -28,13 +34,13 @@ func (ctx *Context) SizeFiles() error {
 		return nil
 	}
 
-	utils.ConsoleAndLogPrintf("Sizing %s with %s in batches of %d", utils.Pluralize("file", count), utils.Pluralize("thread", ctx.Config.MaxConcurrentFileOperations), ctx.Config.BatchSize)
+	utils.ConsoleAndLogPrintf("Sizing %s", utils.Pluralize("file", count))
 
 	bar := progressbar.Default(count)
 
 	// Do batches until there are no more
 	for {
-		var fileHashesToSize []FileIdAndPath
+		var fileHashesToSize []FileHashAndFile
 		result = ctx.DB.Raw(QueryUnSizedFileHashesWithLimit(), ctx.Config.BatchSize).Scan(&fileHashesToSize)
 
 		if result.Error != nil {
@@ -43,38 +49,60 @@ func (ctx *Context) SizeFiles() error {
 
 		// Have we finished?
 		if fileHashesToSize == nil {
-
-			// Update the file sizes from the file hash sizes
-			result = ctx.DB.Exec(`UPDATE files
-			SET size = fh.size
-			FROM file_hashes fh
-			WHERE files.file_hash_id = fh.id`)
-
-			return result.Error
+			return nil
 		}
+
+		var notFoundFileIDs []uint
 
 		orchestrator := utils.NewTaskOrchestrator(bar, len(fileHashesToSize), ctx.Config.MaxConcurrentFileOperations)
 
 		for _, fileHash := range fileHashesToSize {
 			orchestrator.StartTask()
-			go ctx.sizeFile(orchestrator, fileHash)
+			go ctx.sizeFile(orchestrator, fileHash, &notFoundFileIDs)
 		}
 
 		orchestrator.WaitForTasks()
+
+		// Update the file sizes from the file hash sizes
+		result = ctx.DB.Exec(`UPDATE files
+			SET size = fh.size
+			FROM file_hashes fh
+			WHERE files.file_hash_id = fh.id
+			AND fh.size IS NOT NULL
+			AND fh.ignored = 0
+			AND files.size IS NULL
+			AND files.deleted_at IS NULL
+			AND files.ignored = 0`)
+
+		if result.Error != nil {
+			return result.Error
+		}
+
+		if len(notFoundFileIDs) > 0 {
+			result = ctx.DB.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+
+			if result.Error != nil {
+				return result.Error
+			}
+		}
 	}
 }
 
-func (ctx *Context) sizeFile(orchestrator *utils.TaskOrchestrator, fileHashToSize FileIdAndPath) {
-	info, err := os.Stat(fileHashToSize.AbsolutePath)
+func (ctx *Context) sizeFile(orchestrator *utils.TaskOrchestrator, file FileHashAndFile, notFoundFileIDs *[]uint) {
+	info, err := os.Stat(file.AbsolutePath)
 
 	if err != nil {
+		// If the file does not exist we can ignore it
 		if errors.Is(err, os.ErrNotExist) {
-			//orchestrator.Logf("Could not open file \"%s\": %v", fileHashToSize.AbsolutePath, err)
-			log.Printf("Could not open file \"%s\": %v", fileHashToSize.AbsolutePath, err)
+			orchestrator.Lock()
+			log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
+			*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
+			orchestrator.Unlock()
+
 			orchestrator.FinishTask()
 			return
 		} else {
-			log.Fatalf("Could not open file \"%s\": %v", fileHashToSize.AbsolutePath, err)
+			log.Fatalf("Could not open file \"%s\": %v", file.AbsolutePath, err)
 		}
 	}
 
@@ -87,7 +115,7 @@ func (ctx *Context) sizeFile(orchestrator *utils.TaskOrchestrator, fileHashToSiz
 
 	formattedSize := uint(size)
 
-	result := ctx.DB.Model(&models.FileHash{}).Where("id = ?", fileHashToSize.ID).Updates(models.FileHash{
+	result := ctx.DB.Model(&models.FileHash{}).Where("id = ?", file.FileHashID).Updates(models.FileHash{
 		Size: &formattedSize,
 	})
 

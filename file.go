@@ -14,6 +14,14 @@ func IsDir(path string) bool {
 	return false
 }
 
+func IsFile(path string) bool {
+	if info, err := os.Stat(path); err == nil && !info.IsDir() {
+		return true
+	}
+
+	return false
+}
+
 func GetTypeOfFile(file string) (string, error) {
 	command := exec.Command("file", "-b", "--mime-type", file)
 	output, err := command.Output()

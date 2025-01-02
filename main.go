@@ -4,8 +4,10 @@ import (
 	"data-tools/config"
 	"data-tools/utils"
 	_ "embed"
-	"fmt"
+	"github.com/dustin/go-humanize"
 	"log"
+	"strings"
+	"time"
 )
 
 //go:embed config.yaml
@@ -14,11 +16,7 @@ var defaultConfigData []byte
 //goland:noinspection GoUnnecessarilyExportedIdentifiers
 var AppVersion = "6.0"
 
-var usageText = "Usage: go run main.go [db path]"
-
 func main() {
-	print(fmt.Sprintf("data-tools version %s\n", AppVersion))
-
 	c, err := config.Load(defaultConfigData)
 
 	if err != nil {
@@ -36,23 +34,32 @@ func main() {
 		DB:     initDb(c),
 	}
 
-	//err = ctx.AddRootPath("/Users/antfie/Sync")
+	debugFormat := ""
+
+	if c.IsDebug {
+		debugFormat = " (debug)"
+	}
+
+	utils.ConsoleAndLogPrintf("Data Tools version %s%s. Using %s for file operations and batches of %s", AppVersion, debugFormat, utils.Pluralize("thread", ctx.Config.MaxConcurrentFileOperations), humanize.Comma(ctx.Config.BatchSize))
+	startTime := time.Now()
+
+	err = ctx.AddRootPath("/Users/antfie/Sync")
 	//
 	//if err != nil && !errors.Is(err, ErrPathAlreadyAdded) {
 	//	log.Fatal(err)
 	//}
 	//
 	//err = ctx.Crawl()
-	//
+
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
 
-	err = ctx.HashFiles()
+	//err = ctx.HashFiles()
 
-	if err != nil {
-		log.Fatal(err)
-	}
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 	//
 	//err = ctx.SizeFiles()
 	//
@@ -74,7 +81,10 @@ func main() {
 	//
 	//err = ctx.UnZap("foo_output", "bob")
 	//
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	utils.ConsoleAndLogPrintf("Finished in %s", strings.TrimSuffix(humanize.Time(startTime), " ago"))
 }

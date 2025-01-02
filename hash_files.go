@@ -24,9 +24,11 @@ func (ctx *Context) HashFiles() error {
 		return nil
 	}
 
-	utils.ConsoleAndLogPrintf("Hashing %s with %s in batches of %d", utils.Pluralize("file", count), utils.Pluralize("thread", ctx.Config.MaxConcurrentFileOperations), ctx.Config.BatchSize)
+	utils.ConsoleAndLogPrintf("Hashing %s", utils.Pluralize("file", count))
 
 	bar := progressbar.Default(count)
+
+	totalNewUniqueHashes := 0
 
 	// Do batches until there are no more
 	for {
@@ -39,17 +41,22 @@ func (ctx *Context) HashFiles() error {
 
 		// Have we finished?
 		if files == nil {
+			if totalNewUniqueHashes > 0 {
+				log.Printf("Total new and unique hashes found: %d", totalNewUniqueHashes)
+			}
+
 			return nil
 		}
 
 		hashes := make(map[string][]uint, len(files))
 		var uniqueHashes []string
+		var notFoundFileIDs []uint
 
 		orchestrator := utils.NewTaskOrchestrator(bar, len(files), ctx.Config.MaxConcurrentFileOperations)
 
 		for _, file := range files {
 			orchestrator.StartTask()
-			go hashFile(orchestrator, hashes, &uniqueHashes, file)
+			go hashFile(orchestrator, hashes, &uniqueHashes, &notFoundFileIDs, file)
 		}
 
 		orchestrator.WaitForTasks()
@@ -65,6 +72,7 @@ func (ctx *Context) HashFiles() error {
 		var newDBHashes []models.FileHash
 		for _, hash := range uniqueHashes {
 			if getDBHash(hash, existingDBHashes) == nil {
+				totalNewUniqueHashes++
 				newDBHashes = append(newDBHashes, models.FileHash{Hash: hash})
 			}
 		}
@@ -95,14 +103,33 @@ func (ctx *Context) HashFiles() error {
 				return result.Error
 			}
 		}
+
+		if len(notFoundFileIDs) > 0 {
+			result = ctx.DB.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+
+			if result.Error != nil {
+				return result.Error
+			}
+		}
 	}
 }
 
-func hashFile(orchestrator *utils.TaskOrchestrator, hashes map[string][]uint, uniqueHashes *[]string, file FileIdAndPath) {
+func hashFile(orchestrator *utils.TaskOrchestrator, hashes map[string][]uint, uniqueHashes *[]string, notFoundFileIDs *[]uint, file FileIdAndPath) {
+	// If the file does not exist we can ignore it
+	if !IsFile(file.AbsolutePath) {
+		orchestrator.Lock()
+		log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
+		*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
+		orchestrator.Unlock()
+
+		orchestrator.FinishTask()
+		return
+	}
+
 	hash, err := crypto.HashFile(file.AbsolutePath)
 
 	if err != nil {
-		log.Fatalf("hash file %s failed: %v", file.AbsolutePath, err)
+		log.Fatalf("Could not hash file \"%s\": %v", file.AbsolutePath, err)
 	}
 
 	// Maps are not threadsafe
@@ -110,10 +137,10 @@ func hashFile(orchestrator *utils.TaskOrchestrator, hashes map[string][]uint, un
 	existingFileIdsWithThisHash, found := hashes[hash]
 
 	if !found {
-		hashes[hash] = []uint{file.ID}
+		hashes[hash] = []uint{file.FileID}
 		*uniqueHashes = append(*uniqueHashes, hash)
 	} else {
-		hashes[hash] = append(existingFileIdsWithThisHash, file.ID)
+		hashes[hash] = append(existingFileIdsWithThisHash, file.FileID)
 	}
 	orchestrator.Unlock()
 
