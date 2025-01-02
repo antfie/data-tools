@@ -121,22 +121,22 @@ func (ctx *Context) TypeFiles() error {
 	}
 }
 
-func typeFile(orchestrator *utils.TaskOrchestrator, file FileHashAndFile, fileHashTypeMap map[string][]uint, uniqueFileTypes *[]string, notFoundFileIDs *[]uint) {
+func typeFile(orchestrator *utils.TaskOrchestrator, fileHashAndFile FileHashAndFile, fileHashTypeMap map[string][]uint, uniqueFileTypes *[]string, notFoundFileIDs *[]uint) {
 	// If the file does not exist we can ignore it
-	if !IsFile(file.AbsolutePath) {
+	if !IsFile(fileHashAndFile.AbsolutePath) {
 		orchestrator.Lock()
-		log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
-		*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
+		log.Printf("Ignoring not-found file \"%s\"", fileHashAndFile.AbsolutePath)
+		*notFoundFileIDs = append(*notFoundFileIDs, fileHashAndFile.FileID)
 		orchestrator.Unlock()
 
 		orchestrator.FinishTask()
 		return
 	}
 
-	fileType, err := GetTypeOfFile(file.AbsolutePath)
+	fileType, err := GetTypeOfFile(fileHashAndFile.AbsolutePath)
 
 	if err != nil {
-		log.Fatalf("Could not type file \"%s\": %v", file.AbsolutePath, err)
+		log.Fatalf("Could not type file \"%s\": %v", fileHashAndFile.AbsolutePath, err)
 	}
 
 	// Maps are not threadsafe
@@ -144,10 +144,10 @@ func typeFile(orchestrator *utils.TaskOrchestrator, file FileHashAndFile, fileHa
 	existingFileHashIdsWithThisType, found := fileHashTypeMap[fileType]
 
 	if !found {
-		fileHashTypeMap[fileType] = []uint{file.FileID}
+		fileHashTypeMap[fileType] = []uint{fileHashAndFile.FileHashID}
 		*uniqueFileTypes = append(*uniqueFileTypes, fileType)
 	} else {
-		fileHashTypeMap[fileType] = append(existingFileHashIdsWithThisType, file.FileID)
+		fileHashTypeMap[fileType] = append(existingFileHashIdsWithThisType, fileHashAndFile.FileHashID)
 	}
 	orchestrator.Unlock()
 
