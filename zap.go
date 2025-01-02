@@ -4,6 +4,7 @@ import (
 	"data-tools/models"
 	"data-tools/utils"
 	"encoding/hex"
+	"errors"
 	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/dustin/go-humanize"
 	"github.com/schollz/progressbar/v3"
@@ -16,8 +17,9 @@ import (
 const zapFolderName = "ZAP"
 
 type ZapResult struct {
-	ID           uint
+	FileHashID   uint
 	Hash         string
+	FileID       uint
 	AbsolutePath string
 }
 
@@ -55,7 +57,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 		return err
 	}
 
-	utils.ConsoleAndLogPrintf("ZAPing %s with %s in batches of %d", utils.Pluralize("file", info.FileHashesToZap), utils.Pluralize("thread", ctx.Config.MaxConcurrentFileOperations), ctx.Config.BatchSize)
+	utils.ConsoleAndLogPrintf("ZAPing %s", utils.Pluralize("file", info.FileHashesToZap))
 
 	bar := progressbar.Default(info.FileHashesToZap)
 
@@ -80,32 +82,45 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 			return result.Error
 		}
 
+		var notFoundFileIDs []uint
+
 		orchestrator := utils.NewTaskOrchestrator(bar, len(fileHashesToZap), ctx.Config.MaxConcurrentFileOperations)
 
 		for _, fileHash := range fileHashesToZap {
 			orchestrator.StartTask()
-			go ctx.zapHash(orchestrator, safeMode, zapBasePath, fileHash)
+			go ctx.zapHash(orchestrator, safeMode, zapBasePath, fileHash, &notFoundFileIDs)
 		}
 
 		orchestrator.WaitForTasks()
 	}
 }
 
-func (ctx *Context) zapHash(orchestrator *utils.TaskOrchestrator, safeMode bool, zapBasePath string, fileHashToZap ZapResult) {
+func (ctx *Context) zapHash(orchestrator *utils.TaskOrchestrator, safeMode bool, zapBasePath string, file ZapResult, notFoundFileIDs *[]uint) {
+	// If the file does not exist we can ignore it
+	if !IsFile(file.AbsolutePath) {
+		orchestrator.Lock()
+		log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
+		*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
+		orchestrator.Unlock()
+
+		orchestrator.FinishTask()
+		return
+	}
+
 	// Store as hex so it will work OK on case-insensitive filesystems
-	hexFileName := hex.EncodeToString(base58.Decode(fileHashToZap.Hash))
+	hexFileName := hex.EncodeToString(base58.Decode(file.Hash))
 
 	// Only move if not in safe mode
 	move := !safeMode
 
 	// ZAP
-	err := CopyOrMoveFile(fileHashToZap.AbsolutePath, path.Join(zapBasePath, hexFileName), move)
+	err := CopyOrMoveFile(file.AbsolutePath, path.Join(zapBasePath, hexFileName), move)
 
 	if err != nil {
-		log.Fatalf("Could not ZAP file \"%s\": %v", fileHashToZap.AbsolutePath, err)
+		log.Fatalf("Could not ZAP file \"%s\": %v", file.AbsolutePath, err)
 	}
 
-	result := ctx.DB.Model(&models.FileHash{}).Where("id = ?", fileHashToZap.ID).Updates(models.FileHash{
+	result := ctx.DB.Model(&models.FileHash{}).Where("id = ?", file.FileHashID).Updates(models.FileHash{
 		Zapped: true,
 	})
 
@@ -117,6 +132,13 @@ func (ctx *Context) zapHash(orchestrator *utils.TaskOrchestrator, safeMode bool,
 }
 
 func (ctx *Context) UnZap(sourcePath, outputPath string) error {
+	_, err := os.Stat(outputPath)
+
+	// We expect the output directory to be empty
+	if err != nil || !errors.Is(err, os.ErrNotExist) {
+		return ErrDestinationPathNotEmpty
+	}
+
 	type ZapInfo struct {
 		ZappedFileHashes        int64
 		UniqueHashTotalFileSize uint64
@@ -168,21 +190,42 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 			return nil
 		}
 
+		var notFoundFileIDs []uint
+
 		orchestrator := utils.NewTaskOrchestrator(bar, len(fileHashesToUnZap), ctx.Config.MaxConcurrentFileOperations)
 
 		zapSourcePath := path.Join(sourcePath, zapFolderName)
 
 		for _, fileHash := range fileHashesToUnZap {
 			orchestrator.StartTask()
-			go ctx.unZapHash(orchestrator, &processedFileIds, zapSourcePath, destinationAbsolutePath, &fileHash)
+			go ctx.unZapHash(orchestrator, &processedFileIds, zapSourcePath, destinationAbsolutePath, &fileHash, &notFoundFileIDs)
 		}
 
 		orchestrator.WaitForTasks()
+
+		if len(notFoundFileIDs) > 0 {
+			result = ctx.DB.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+
+			if result.Error != nil {
+				return result.Error
+			}
+		}
 	}
 }
 
-func (ctx *Context) unZapHash(orchestrator *utils.TaskOrchestrator, processedFileIds *[]uint, zapSourcePath, destinationAbsolutePath string, fileHashToUnZap *ZapResult) {
-	destinationPath := path.Join(destinationAbsolutePath, fileHashToUnZap.AbsolutePath)
+func (ctx *Context) unZapHash(orchestrator *utils.TaskOrchestrator, processedFileIds *[]uint, zapSourcePath, destinationAbsolutePath string, file *ZapResult, notFoundFileIDs *[]uint) {
+	// If the file does not exist we can ignore it
+	if !IsFile(zapSourcePath) {
+		orchestrator.Lock()
+		log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
+		*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
+		orchestrator.Unlock()
+
+		orchestrator.FinishTask()
+		return
+	}
+
+	destinationPath := path.Join(destinationAbsolutePath, file.AbsolutePath)
 
 	// Make the destination directory if required
 	err := os.MkdirAll(path.Dir(destinationPath), 0700)
@@ -191,7 +234,7 @@ func (ctx *Context) unZapHash(orchestrator *utils.TaskOrchestrator, processedFil
 		log.Panic(err)
 	}
 
-	hexFileName := hex.EncodeToString(base58.Decode(fileHashToUnZap.Hash))
+	hexFileName := hex.EncodeToString(base58.Decode(file.Hash))
 
 	// un-ZAP
 	err = CopyOrMoveFile(path.Join(zapSourcePath, hexFileName), destinationPath, false)
@@ -201,7 +244,7 @@ func (ctx *Context) unZapHash(orchestrator *utils.TaskOrchestrator, processedFil
 	}
 
 	orchestrator.Lock()
-	*processedFileIds = append(*processedFileIds, fileHashToUnZap.ID)
+	*processedFileIds = append(*processedFileIds, file.FileID)
 	orchestrator.Unlock()
 
 	orchestrator.FinishTask()
