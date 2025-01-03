@@ -1,6 +1,8 @@
 ![GitHub License](https://img.shields.io/github/license/antfie/data-tools)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/antfie/data-tools)
 [![Go Report Card](https://goreportcard.com/badge/github.com/antfie/data-tools)](https://goreportcard.com/report/github.com/antfie/data-tools)
+![Docker Image Size](https://img.shields.io/docker/image-size/antfie/data-tools/latest)
+![Docker Pulls](https://img.shields.io/docker/pulls/antfie/data-tools)
 
 # Data Tools
 
