@@ -5,7 +5,27 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 )
+
+func CopyOrMoveFiles(source, destination string, move bool) error {
+	files, err := GetAllFiles(source)
+
+	if err != nil {
+		return err
+	}
+
+	for _, sourceFilePath := range files {
+		relativePath := strings.TrimPrefix(sourceFilePath, source)
+		err := CopyOrMoveFile(sourceFilePath, path.Join(destination, relativePath), move)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 
 func CopyOrMoveFile(source, destination string, move bool) error {
 	destinationIsTheSame, err := isDestinationTheSame(source, destination)

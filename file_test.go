@@ -5,25 +5,38 @@ import (
 	"testing"
 )
 
-func TestGetPathsForMkdirs(t *testing.T) {
-	var inputs = []string{
-		"/c/t.docx",
-		"/foo/bar/a/b/c/d/foo.png",
-		"/foo/bar/a/b/c/d/e/f/g/foo.PDF",
-		"/note.md",
-		"/foo/bar/a/b/c/d/e/f/g/r.txt",
-		"/foo/bar/y/t.docx",
-		"/foo/bar/a/b/c/d/e/f/k/r.txt",
-		"/foo/x.go",
-	}
+var pathForInputs = []string{
+	"/j/c/t.docx",
+	"/j/foo/bar/a/b/c/d/foo.png",
+	"/j/foo/bar/a/b/c/d/e/f/g/foo.PDF",
+	"/j/note.md",
+	"/j/foo/bar/a/b/c/d/e/f/g/r.txt",
+	"/j/foo/bar/y/t.docx",
+	"/j/foo/bar/a/b/c/d/e/f/k/r.txt",
+	"/j/foo/x.go",
+}
 
-	result := getPathsForMkdirs(inputs)
+func TestGetPathsForMkdirs(t *testing.T) {
+
+	result := getPathsForMkdirs(pathForInputs)
 
 	var expected = []string{
-		"/foo/bar/a/b/c/d/e/f/g",
-		"/foo/bar/a/b/c/d/e/f/k",
-		"/foo/bar/y",
-		"/c",
+		"/j/foo/bar/a/b/c/d/e/f/g",
+		"/j/foo/bar/a/b/c/d/e/f/k",
+		"/j/foo/bar/y",
+		"/j/c",
+	}
+
+	assert.ElementsMatch(t, expected, result)
+}
+
+func TestGetPathsForRMDir(t *testing.T) {
+	result := getPathsForRMDir(pathForInputs)
+
+	var expected = []string{
+		"/j/foo/bar/a",
+		"/j/foo/bar/y",
+		"/j/c",
 	}
 
 	assert.ElementsMatch(t, expected, result)

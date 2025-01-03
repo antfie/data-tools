@@ -128,6 +128,36 @@ LIMIT 		?
 `, fileAbsolutePathCTEQuery)
 }
 
+func QueryGetDuplicateFilesToZapWithLimit() string {
+	return fmt.Sprintf(`
+SELECT		f.id file_id,
+			%s
+FROM 		files f
+JOIN 		file_hashes fh ON f.file_hash_id = fh.id
+WHERE		f.zapped = 0
+AND			f.deleted_at IS NULL
+AND			f.ignored = 0
+AND			fh.zapped = 1
+AND			fh.ignored = 0
+ORDER BY	f.id -- for deterministic result order
+LIMIT 		?
+`, fileAbsolutePathCTEQuery)
+}
+
+func QueryGetZappedFolders() string {
+	return fmt.Sprintf(`
+SELECT		%s
+FROM 		files f
+JOIN 		file_hashes fh ON f.file_hash_id = fh.id
+WHERE		f.zapped = 1
+AND			f.deleted_at IS NULL
+AND			f.ignored = 0
+AND			fh.zapped = 1
+AND			fh.ignored = 0
+ORDER BY	f.id -- for deterministic result order
+`, fileAbsolutePathCTEQuery)
+}
+
 func QueryGetZappedFileHashesToUnZapWithLimit() string {
 	return fmt.Sprintf(`
 SELECT		fh.id file_hash_id,
@@ -142,7 +172,7 @@ AND			f.ignored = 0
 AND			fh.zapped = 1
 AND			fh.ignored = 0
 AND			f.id NOT IN ?
-ORDER BY	fh.id -- for deterministic result order
+ORDER BY	f.id -- for deterministic result order
 LIMIT 		?
 `, fileAbsolutePathCTEQuery)
 }

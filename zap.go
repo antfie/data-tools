@@ -21,6 +21,22 @@ type ZapResult struct {
 }
 
 func (ctx *Context) Zap(outputPath string, safeMode bool) error {
+	err := ctx.copyDeduplicatedFiles(outputPath, safeMode)
+
+	if err != nil {
+		return err
+	}
+
+	err = ctx.removeDuplicates(safeMode)
+
+	if err != nil {
+		return err
+	}
+
+	return ctx.removeEmptyZappedFolders(safeMode)
+}
+
+func (ctx *Context) copyDeduplicatedFiles(outputPath string, safeMode bool) error {
 	type ZapInfo struct {
 		FileHashesToZap         int64
 		UniqueHashTotalFileSize uint64
@@ -50,15 +66,15 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 		return err
 	}
 
-	remainingPercentage := (float64(info.TotalFileSize-info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
-	removalPercentage := (float64(info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
-	utils.ConsoleAndLogPrintf("Zapping (de-duplicating) %s (%s) to \"%s\". This is %.2f%% of %s, a reduction of %s (%.2f%%)", utils.Pluralize("file", info.FileHashesToZap), humanize.Bytes(info.TotalFileSize-info.UniqueHashTotalFileSize), outputPathAbs, remainingPercentage, humanize.Bytes(info.TotalFileSize), humanize.Bytes(info.TotalFileSize-(info.TotalFileSize-info.UniqueHashTotalFileSize)), removalPercentage)
-
 	err = os.MkdirAll(outputPathAbs, 0700)
 
 	if err != nil {
 		return err
 	}
+
+	remainingPercentage := (float64(info.TotalFileSize-info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
+	removalPercentage := (float64(info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
+	utils.ConsoleAndLogPrintf("Copying %s (%s) to \"%s\". This is %.2f%% of %s, a reduction of %s (%.2f%%)", utils.Pluralize("de-duplicated file", info.FileHashesToZap), humanize.Bytes(info.TotalFileSize-info.UniqueHashTotalFileSize), outputPathAbs, remainingPercentage, humanize.Bytes(info.TotalFileSize), humanize.Bytes(info.TotalFileSize-(info.TotalFileSize-info.UniqueHashTotalFileSize)), removalPercentage)
 
 	bar := progressbar.Default(info.FileHashesToZap)
 
@@ -73,18 +89,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 		// Have we finished?
 		if fileHashesToZap == nil {
-			// Update the file zap status from the file hash zap status
-			result = ctx.DB.Exec(`UPDATE files
-			SET zapped = 1
-			FROM file_hashes fh
-			WHERE files.file_hash_id = fh.id
-			AND	fh.zapped = 1
-		  	AND fh.ignored = 0
-			AND	files.zapped = 0
-			AND files.deleted_at IS NULL
-			AND files.ignored = 0`)
-
-			return result.Error
+			return nil
 		}
 
 		var notFoundFileIDs []uint
@@ -97,10 +102,6 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 		}
 
 		orchestrator.WaitForTasks()
-
-		if !safeMode {
-			// TODO: Bulk remove duplicates or bin off the root folder. Maybe better doing this in zapFile for safery
-		}
 	}
 }
 
@@ -137,10 +138,119 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 		log.Fatalf("DB Error: %v", result.Error)
 	}
 
-	if !safeMode {
-		// TODO: Remove any other duplicates, or do that in bulk?
-		// might be safer to do this here
+	result = ctx.DB.Model(&models.File{}).Where("id = ?", file.FileID).Updates(models.File{
+		Zapped: true,
+	})
+
+	if result.Error != nil {
+		log.Fatalf("DB Error: %v", result.Error)
 	}
 
 	orchestrator.FinishTask()
+}
+
+func (ctx *Context) removeDuplicates(safeMode bool) error {
+	type ZapInfo struct {
+		CountOfFilesToRemove  int64
+		TotalFileSizeToRemove uint64
+	}
+
+	var info ZapInfo
+	result := ctx.DB.Raw(`
+SELECT		COUNT(*) count_of_files_to_remove,
+			SUM(f.size) total_file_size_to_remove
+FROM 		files f
+JOIN 		file_hashes fh ON f.file_hash_id = fh.id
+WHERE		f.zapped = 0
+AND			f.deleted_at IS NULL
+AND			f.ignored = 0
+AND			fh.zapped = 1
+AND			fh.ignored = 0
+`).First(&info)
+
+	utils.ConsoleAndLogPrintf("Removing %s (%s)", utils.Pluralize("duplicate file", info.CountOfFilesToRemove), humanize.Bytes(info.TotalFileSizeToRemove))
+
+	bar := progressbar.Default(info.CountOfFilesToRemove)
+
+	// Do batches until there are no more
+	for {
+		var duplicateFilesToRemove []FileIdAndPath
+		result = ctx.DB.Raw(QueryGetDuplicateFilesToZapWithLimit(), ctx.Config.BatchSize).Scan(&duplicateFilesToRemove)
+
+		if result.Error != nil {
+			return result.Error
+		}
+
+		// Have we finished?
+		if duplicateFilesToRemove == nil {
+			return nil
+		}
+
+		orchestrator := utils.NewTaskOrchestrator(bar, len(duplicateFilesToRemove), ctx.Config.MaxConcurrentFileOperations)
+
+		var notFoundFileIDs []uint
+
+		for _, file := range duplicateFilesToRemove {
+			orchestrator.StartTask()
+			go ctx.removeDuplicateFile(orchestrator, safeMode, file, &notFoundFileIDs)
+		}
+
+		orchestrator.WaitForTasks()
+
+		if len(notFoundFileIDs) > 0 {
+			result = ctx.DB.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+
+			if result.Error != nil {
+				return result.Error
+			}
+		}
+	}
+}
+
+func (ctx *Context) removeDuplicateFile(orchestrator *utils.TaskOrchestrator, safeMode bool, file FileIdAndPath, notFoundFileIDs *[]uint) {
+	// If the file does not exist we can ignore it
+	if !IsFile(file.AbsolutePath) {
+		orchestrator.Lock()
+		log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
+		*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
+		orchestrator.Unlock()
+
+		orchestrator.FinishTask()
+		return
+	}
+
+	if !safeMode {
+		err := os.Remove(file.AbsolutePath)
+
+		if err != nil {
+			log.Fatalf("Could not remove file \"%s\": %v", file.AbsolutePath, err)
+		}
+	}
+
+	result := ctx.DB.Model(&models.File{}).Where("id = ?", file.FileID).Updates(models.File{
+		Zapped: true,
+	})
+
+	if result.Error != nil {
+		log.Fatalf("DB Error: %v", result.Error)
+	}
+
+	orchestrator.FinishTask()
+}
+
+func (ctx *Context) removeEmptyZappedFolders(safeMode bool) error {
+	utils.ConsoleAndLogPrintf("Removing empty folders")
+
+	var foldersToProcess []string
+	result := ctx.DB.Raw(QueryGetZappedFolders()).Scan(&foldersToProcess)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if safeMode {
+		return nil
+	}
+
+	return clearEmptyFolders(foldersToProcess)
 }

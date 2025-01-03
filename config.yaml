@@ -7,5 +7,6 @@ max_concurrent_file_operations: 10
 file_names_to_ignore:
   - .DS_Store
 
-#folder_names_to_ignore:
+folder_names_to_ignore:
+  - "@eaDir"
 #  - .stversions

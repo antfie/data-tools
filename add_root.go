@@ -21,11 +21,8 @@ func (ctx *Context) AddRootPath(rootPath string) error {
 
 	utils.ConsoleAndLogPrintf("Adding root path \"%s\"", absoluteRootPath)
 
-	var pathModel = models.Path{
-		Name:  absoluteRootPath,
-		Level: 0,
-	}
-	result := ctx.DB.First(&pathModel)
+	var pathModel models.Path
+	result := ctx.DB.Where("name = ?", absoluteRootPath).First(&pathModel)
 
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return result.Error

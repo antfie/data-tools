@@ -18,10 +18,10 @@ fi
 FLAGS="-X main.AppVersion=$VERSION -s -w"
 
 echo -e "\n${CYAN}Building v${VERSION}...${NC}"
-GOOS=darwin GOARCH=arm64 go build -ldflags="$FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-2025-mac-arm64-${VERSION}" .
-GOOS=darwin GOARCH=amd64 go build -ldflags="$FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-2025-mac-amd64-${VERSION}" .
-GOOS=linux GOARCH=arm64 go build -ldflags="$FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-2025-linux-arm64-${VERSION}" .
-GOOS=linux GOARCH=amd64 go build -ldflags="$FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-2025-linux-amd64-${VERSION}" .
-GOOS=windows GOARCH=amd64 go build -ldflags="$FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-2025-${VERSION}.exe" .
+GOOS=darwin GOARCH=arm64 go build -ldflags="$FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-mac-arm64-${VERSION}" .
+GOOS=darwin GOARCH=amd64 go build -ldflags="$FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-mac-amd64-${VERSION}" .
+GOOS=linux GOARCH=arm64 go build -ldflags="$FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-linux-arm64-${VERSION}" .
+GOOS=linux GOARCH=amd64 go build -ldflags="$FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-linux-amd64-${VERSION}" .
+GOOS=windows GOARCH=amd64 go build -ldflags="$FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-${VERSION}.exe" .
 
 echo -e "\n${CYAN}Build Success${NC}"
