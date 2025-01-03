@@ -4,6 +4,7 @@ import (
 	"data-tools/config"
 	"data-tools/utils"
 	_ "embed"
+	"errors"
 	"fmt"
 	"github.com/dustin/go-humanize"
 	"log"
@@ -45,43 +46,42 @@ func main() {
 	startTime := time.Now()
 
 	err = ctx.AddRootPath("/Users/antfie/Sync")
-	//
-	//if err != nil && !errors.Is(err, ErrPathAlreadyAdded) {
-	//	log.Fatal(err)
-	//}
-	//
+
+	if err != nil && !errors.Is(err, ErrPathAlreadyAdded) {
+		log.Fatal(err)
+	}
+
 	err = ctx.Crawl()
 
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	err = ctx.HashFiles()
 
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = ctx.SizeFiles()
-	//
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = ctx.TypeFiles()
-	//
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = ctx.Zap("foo_output", true)
-	//
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	err = ctx.UnZap("foo_output", "bob")
-	//
 
 	if err != nil {
 		log.Fatal(err)

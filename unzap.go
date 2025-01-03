@@ -73,6 +73,12 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 			return nil
 		}
 
+		err = createFolders(destinationAbsolutePath, fileHashesToUnZap)
+
+		if err != nil {
+			return err
+		}
+
 		var notFoundFileIDs []uint
 
 		orchestrator := utils.NewTaskOrchestrator(bar, len(fileHashesToUnZap), ctx.Config.MaxConcurrentFileOperations)
@@ -94,6 +100,26 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 	}
 }
 
+func createFolders(destinationAbsolutePath string, fileHashesToUnZap []ZapResult) error {
+	var resolvedPaths []string
+
+	for _, file := range fileHashesToUnZap {
+		resolvedPaths = append(resolvedPaths, path.Join(destinationAbsolutePath, file.AbsolutePath))
+	}
+
+	foldersToMake := getPathsForMkdirs(resolvedPaths)
+
+	for _, folderPath := range foldersToMake {
+		err := os.MkdirAll(folderPath, 0700)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (ctx *Context) unZapFile(orchestrator *utils.TaskOrchestrator, processedFileIds *[]uint, zapSourcePath, destinationAbsolutePath string, file *ZapResult, notFoundFileIDs *[]uint) {
 	hexFileName := hex.EncodeToString(base58.Decode(file.Hash))
 	sourceFilePath := path.Join(zapSourcePath, hexFileName)
@@ -111,15 +137,8 @@ func (ctx *Context) unZapFile(orchestrator *utils.TaskOrchestrator, processedFil
 
 	destinationFilePath := path.Join(destinationAbsolutePath, file.AbsolutePath)
 
-	// Make the destination directory if required
-	err := os.MkdirAll(path.Dir(destinationFilePath), 0700)
-
-	if err != nil {
-		log.Panic(err)
-	}
-
 	// un-ZAP
-	err = CopyOrMoveFile(sourceFilePath, destinationFilePath, false)
+	err := CopyOrMoveFile(sourceFilePath, destinationFilePath, false)
 
 	if err != nil {
 		log.Panic(err)

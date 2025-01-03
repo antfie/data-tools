@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 )
 
 type ZapResult struct {
@@ -43,16 +44,21 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 		return nil
 	}
 
-	percentage := (float64(info.TotalFileSize-info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
-	utils.ConsoleAndLogPrintf("ZAPing %s (%.2f%%) of %s", humanize.Bytes(info.TotalFileSize-info.UniqueHashTotalFileSize), percentage, humanize.Bytes(info.TotalFileSize))
-
-	err := os.MkdirAll(outputPath, 0700)
+	outputPathAbs, err := filepath.Abs(outputPath)
 
 	if err != nil {
 		return err
 	}
 
-	utils.ConsoleAndLogPrintf("ZAPing %s", utils.Pluralize("file", info.FileHashesToZap))
+	remainingPercentage := (float64(info.TotalFileSize-info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
+	removalPercentage := (float64(info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
+	utils.ConsoleAndLogPrintf("Zapping (de-duplicating) %s (%s) to \"%s\". This is %.2f%% of %s, a reduction of %s (%.2f%%)", utils.Pluralize("file", info.FileHashesToZap), humanize.Bytes(info.TotalFileSize-info.UniqueHashTotalFileSize), outputPathAbs, remainingPercentage, humanize.Bytes(info.TotalFileSize), humanize.Bytes(info.TotalFileSize-(info.TotalFileSize-info.UniqueHashTotalFileSize)), removalPercentage)
+
+	err = os.MkdirAll(outputPathAbs, 0700)
+
+	if err != nil {
+		return err
+	}
 
 	bar := progressbar.Default(info.FileHashesToZap)
 
@@ -87,7 +93,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 		for _, fileHash := range fileHashesToZap {
 			orchestrator.StartTask()
-			go ctx.zapFile(orchestrator, safeMode, outputPath, fileHash, &notFoundFileIDs)
+			go ctx.zapFile(orchestrator, safeMode, outputPathAbs, fileHash, &notFoundFileIDs)
 		}
 
 		orchestrator.WaitForTasks()
@@ -131,7 +137,7 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 		log.Fatalf("DB Error: %v", result.Error)
 	}
 
-	if move {
+	if !safeMode {
 		// TODO: Remove any other duplicates, or do that in bulk?
 		// might be safer to do this here
 	}
