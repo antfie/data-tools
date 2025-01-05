@@ -14,9 +14,9 @@ Disclaimer: I will not be responsible for any data loss caused by this tool.
 
 1. `add_root /some/path`
 1. `crawl`
-1. `size`
-1. `type`
 1. `hash`
+2. `size`
+1. `type`
 1. `zap`
 
 # ZAP-ing

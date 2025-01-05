@@ -81,6 +81,9 @@ func (ctx *Context) runCommand(command string) error {
 	case "crawl":
 		return ctx.Crawl()
 
+	case "hash":
+		return ctx.HashFiles()
+
 	case "size":
 		return ctx.SizeFiles()
 
