@@ -37,7 +37,7 @@ func connect(dsn string, gormConfig *gorm.Config) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(dsn), gormConfig)
 
 	if err != nil {
-		log.Fatalf("failed to connect to the database")
+		log.Fatalf("failed to connect to the database: %v", err)
 	}
 
 	err = db.AutoMigrate(&models.Path{}, &models.Root{}, &models.File{})
