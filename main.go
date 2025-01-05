@@ -9,14 +9,18 @@ import (
 	"github.com/dustin/go-humanize"
 	"log"
 	"math"
+	"os"
+	"strings"
 	"time"
 )
 
-//go:embed config.yaml
-var defaultConfigData []byte
-
 //goland:noinspection GoUnnecessarilyExportedIdentifiers
 var AppVersion = "6.0"
+
+var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  add_root\n  crawl\n  size\n  hash\n  zap\n  unzap\n"
+
+//go:embed config.yaml
+var defaultConfigData []byte
 
 func main() {
 	c, err := config.Load(defaultConfigData)
@@ -45,46 +49,10 @@ func main() {
 	utils.ConsoleAndLogPrintf("Data Tools version %s%s. Using %s for file operations and batches of %s", AppVersion, debugFormat, utils.Pluralize("thread", ctx.Config.MaxConcurrentFileOperations), humanize.Comma(ctx.Config.BatchSize))
 	startTime := time.Now()
 
-	err = ctx.AddRootPath("/Users/antfie/Sync")
-
-	if err != nil && !errors.Is(err, ErrPathAlreadyAdded) {
-		log.Fatal(err)
-	}
-
-	err = ctx.Crawl()
+	err = ctx.runCommand(strings.ToLower(os.Args[1]))
 
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = ctx.HashFiles()
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = ctx.SizeFiles()
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = ctx.TypeFiles()
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = ctx.Zap("foo_output", true)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = ctx.UnZap("foo_output", "bob")
-
-	if err != nil {
-		log.Fatal(err)
+		utils.ConsoleAndLogPrintf("%v", err)
 	}
 
 	duration := math.Round(time.Since(startTime).Seconds())
@@ -95,4 +63,39 @@ func main() {
 	}
 
 	utils.ConsoleAndLogPrintf("Finished in %s", formattedDuration)
+}
+
+func (ctx *Context) runCommand(command string) error {
+	switch command {
+	case "add_root":
+		if len(os.Args) != 3 {
+			log.Fatal("Move requires source and destination.")
+		}
+		return ctx.AddRootPath(os.Args[2])
+
+	case "crawl":
+		return ctx.Crawl()
+
+	case "size":
+		return ctx.SizeFiles()
+
+	case "type":
+		return ctx.TypeFiles()
+
+	case "zap":
+		if len(os.Args) != 3 {
+			log.Fatal("Move requires source and destination.")
+		}
+
+		return ctx.Zap(os.Args[2], false)
+
+	case "unzap":
+		if len(os.Args) != 4 {
+			log.Fatal("Move requires source and destination.")
+		}
+
+		return ctx.UnZap(os.Args[2], os.Args[3])
+	}
+
+	return errors.New(fmt.Sprintf("Command \"%s\" not recognised. %s", command, usageText))
 }

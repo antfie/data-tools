@@ -8,6 +8,17 @@
 
 Disclaimer: I will not be responsible for any data loss caused by this tool.
 
+# Configuration
+
+# Running Order
+
+1. `add_root /some/path`
+1. `crawl`
+1. `size`
+1. `type`
+1. `hash`
+1. `zap`
+
 # ZAP-ing
 
 When you ZAP your files, every unique file is placed in a folder and all duplicate copies are removed.

@@ -36,7 +36,9 @@ func (ctx *Context) AddRootPath(rootPath string) error {
 
 	// Add the root path
 	result = ctx.DB.Create(&models.Root{
-		Path: pathModel,
+		Path: models.Path{
+			Name: absoluteRootPath,
+		},
 	})
 
 	return result.Error
