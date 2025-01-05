@@ -49,10 +49,15 @@ func main() {
 	utils.ConsoleAndLogPrintf("Data Tools version %s%s. Using %s for file operations and batches of %s", AppVersion, debugFormat, utils.Pluralize("thread", ctx.Config.MaxConcurrentFileOperations), humanize.Comma(ctx.Config.BatchSize))
 	startTime := time.Now()
 
+	if len(os.Args) < 2 {
+		utils.ConsoleAndLogPrintf(fmt.Sprintf("A command must be specified. %s", usageText))
+		return
+	}
+
 	err = ctx.runCommand(strings.ToLower(os.Args[1]))
 
 	if err != nil {
-		utils.ConsoleAndLogPrintf("%v", err)
+		utils.ConsoleAndLogPrintf("Error: %v", err)
 	}
 
 	duration := math.Round(time.Since(startTime).Seconds())
@@ -69,7 +74,7 @@ func (ctx *Context) runCommand(command string) error {
 	switch command {
 	case "add_root":
 		if len(os.Args) != 3 {
-			log.Fatal("Move requires source and destination.")
+			log.Fatal("add_root requires a root path.")
 		}
 		return ctx.AddRootPath(os.Args[2])
 
@@ -84,14 +89,14 @@ func (ctx *Context) runCommand(command string) error {
 
 	case "zap":
 		if len(os.Args) != 3 {
-			log.Fatal("Move requires source and destination.")
+			log.Fatal("zap requires a destination path.")
 		}
 
 		return ctx.Zap(os.Args[2], false)
 
 	case "unzap":
 		if len(os.Args) != 4 {
-			log.Fatal("Move requires source and destination.")
+			log.Fatal("unzap requires a source and destination path.")
 		}
 
 		return ctx.UnZap(os.Args[2], os.Args[3])
