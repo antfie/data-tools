@@ -17,7 +17,7 @@ import (
 //goland:noinspection GoUnnecessarilyExportedIdentifiers
 var AppVersion = "6.0"
 
-var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  add_root\n  crawl\n  size\n  hash\n  zap\n  unzap\n"
+var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  add_root\n  crawl\n  hash\n  size\n  type\n  zap\n  unzap\n"
 
 //go:embed config.yaml
 var defaultConfigData []byte

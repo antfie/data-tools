@@ -18,6 +18,7 @@ Disclaimer: I will not be responsible for any data loss caused by this tool.
 2. `size`
 1. `type`
 1. `zap`
+1. `unzap`
 
 # ZAP-ing
 
