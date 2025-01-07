@@ -1,5 +1,5 @@
 debug: false
-db_path: test.db
+db_path: data.db
 log_file_path: data-tools.log
 batch_size: 1000
 max_concurrent_file_operations: 10
