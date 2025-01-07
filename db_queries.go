@@ -176,3 +176,30 @@ ORDER BY	f.id -- for deterministic result order
 LIMIT 		?
 `, fileAbsolutePathCTEQuery)
 }
+
+func QueryHashSanity() string {
+	return fmt.Sprintf(`
+SELECT      f.id file_id,
+            fh.id file_hash_id,
+            fh.hash,
+            fh.size,
+            ft.type,
+            %s
+FROM        files f
+JOIN        file_hashes fh ON f.file_hash_id = fh.id
+JOIN        main.file_types ft ON f.file_type_id = ft.id
+WHERE       (
+                SELECT  COUNT(f.id)
+                FROM    files f
+                WHERE f.file_hash_id = fh.id
+            ) > 1
+AND			f.zapped = 0
+AND			f.deleted_at IS NULL
+AND			f.ignored = 0
+AND			fh.zapped = 0
+AND			fh.ignored = 0
+AND			fh.size IS NOT NULL
+AND			fh.file_type_id IS NOT NULL
+ORDER BY  	fh.id -- for deterministic result order
+`, fileAbsolutePathCTEQuery)
+}

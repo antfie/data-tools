@@ -54,7 +54,7 @@ func (ctx *Context) SizeFiles() error {
 		// Have we finished?
 		if fileHashesToSize == nil {
 			if totalFilesSized > 0 {
-				log.Printf("Sized %s totalling: %s", utils.Pluralize("file", totalFilesSized), humanize.Bytes(uint64(totalFileSize)))
+				utils.ConsoleAndLogPrintf("Sized %s totalling: %s", utils.Pluralize("file", totalFilesSized), humanize.Bytes(uint64(totalFileSize)))
 			}
 
 			return nil

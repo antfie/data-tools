@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/dustin/go-humanize"
 	"log"
-	"math"
 	"os"
 	"strings"
 	"time"
@@ -17,7 +16,7 @@ import (
 //goland:noinspection GoUnnecessarilyExportedIdentifiers
 var AppVersion = "6.0"
 
-var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  add_root\n  crawl\n  hash\n  size\n  type\n  zap\n  unzap\n"
+var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  add_root\n  crawl\n  hash\n  size\n  type\n  duplicate_hash_sanity_check\n  zap\n  unzap\n"
 
 //go:embed config.yaml
 var defaultConfigData []byte
@@ -60,14 +59,7 @@ func main() {
 		utils.ConsoleAndLogPrintf("Error: %v", err)
 	}
 
-	duration := math.Round(time.Since(startTime).Seconds())
-	formattedDuration := fmt.Sprintf("%.0f second", duration)
-
-	if duration != 1 {
-		formattedDuration += "s"
-	}
-
-	utils.ConsoleAndLogPrintf("Finished in %s", formattedDuration)
+	utils.ConsoleAndLogPrintf("Finished in %s", utils.FormatDuration(time.Since(startTime)))
 }
 
 func (ctx *Context) runCommand(command string) error {
@@ -89,6 +81,9 @@ func (ctx *Context) runCommand(command string) error {
 
 	case "type":
 		return ctx.TypeFiles()
+
+	case "duplicate_hash_sanity_check":
+		return ctx.DuplicateHashSanityCheck()
 
 	case "zap":
 		if len(os.Args) != 3 {

@@ -124,6 +124,8 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 	move := !safeMode
 
 	// ZAP
+
+	// TODO: for collision detection, no do not compare the files. If file with same hash then consider it the same, no need to re-hash, just ignore, move on
 	err := CopyOrMoveFile(file.AbsolutePath, path.Join(zapBasePath, hexFileName), move)
 
 	if err != nil {

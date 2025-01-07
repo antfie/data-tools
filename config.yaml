@@ -9,4 +9,8 @@ file_names_to_ignore:
 
 folder_names_to_ignore:
   - "@eaDir"
+  - .Trashes
+  - .TemporaryItems
+  - .DocumentRevisions-V100
+  - .Spotlight-V100
 #  - .stversions

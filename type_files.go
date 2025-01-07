@@ -27,6 +27,8 @@ func (ctx *Context) TypeFiles() error {
 
 	bar := progressbar.Default(count)
 
+	totalFilesTyped := int64(0)
+
 	// Do batches until there are no more
 	for {
 		var fileHashesToType []FileHashAndFile
@@ -38,6 +40,10 @@ func (ctx *Context) TypeFiles() error {
 
 		// Have we finished?
 		if fileHashesToType == nil {
+			if totalFilesTyped > 0 {
+				utils.ConsoleAndLogPrintf("typed %s", utils.Pluralize("file", totalFilesTyped))
+			}
+
 			return nil
 		}
 
@@ -49,7 +55,7 @@ func (ctx *Context) TypeFiles() error {
 
 		for _, fileHash := range fileHashesToType {
 			orchestrator.StartTask()
-			go typeFile(orchestrator, fileHash, fileHashTypeMap, &uniqueFileTypes, &notFoundFileIDs)
+			go typeFile(orchestrator, fileHash, fileHashTypeMap, &uniqueFileTypes, &notFoundFileIDs, &totalFilesTyped)
 		}
 
 		orchestrator.WaitForTasks()
@@ -121,7 +127,7 @@ func (ctx *Context) TypeFiles() error {
 	}
 }
 
-func typeFile(orchestrator *utils.TaskOrchestrator, fileHashAndFile FileHashAndFile, fileHashTypeMap map[string][]uint, uniqueFileTypes *[]string, notFoundFileIDs *[]uint) {
+func typeFile(orchestrator *utils.TaskOrchestrator, fileHashAndFile FileHashAndFile, fileHashTypeMap map[string][]uint, uniqueFileTypes *[]string, notFoundFileIDs *[]uint, totalFilesTyped *int64) {
 	// If the file does not exist we can ignore it
 	if !IsFile(fileHashAndFile.AbsolutePath) {
 		orchestrator.Lock()
@@ -141,6 +147,7 @@ func typeFile(orchestrator *utils.TaskOrchestrator, fileHashAndFile FileHashAndF
 
 	// Maps are not threadsafe
 	orchestrator.Lock()
+	*totalFilesTyped++
 	existingFileHashIdsWithThisType, found := fileHashTypeMap[fileType]
 
 	if !found {
