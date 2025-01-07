@@ -5,6 +5,7 @@ import (
 	"data-tools/models"
 	"data-tools/utils"
 	"errors"
+	"github.com/dustin/go-humanize"
 	"github.com/schollz/progressbar/v3"
 	"gorm.io/gorm"
 	"log"
@@ -28,7 +29,8 @@ func (ctx *Context) HashFiles() error {
 
 	bar := progressbar.Default(count)
 
-	totalNewUniqueHashes := 0
+	totalNewUniqueHashes := int64(0)
+	duplicateHashes := int64(0)
 
 	// Do batches until there are no more
 	for {
@@ -42,7 +44,7 @@ func (ctx *Context) HashFiles() error {
 		// Have we finished?
 		if files == nil {
 			if totalNewUniqueHashes > 0 {
-				log.Printf("Total new and unique hashes found: %d", totalNewUniqueHashes)
+				utils.ConsoleAndLogPrintf("Total new and unique hashes found: %d, duplicate hashes found: %d", humanize.Comma(totalNewUniqueHashes), humanize.Comma(duplicateHashes))
 			}
 
 			return nil
@@ -74,6 +76,8 @@ func (ctx *Context) HashFiles() error {
 			if getDBHash(hash, existingDBHashes) == nil {
 				totalNewUniqueHashes++
 				newDBHashes = append(newDBHashes, models.FileHash{Hash: hash})
+			} else {
+				duplicateHashes++
 			}
 		}
 
