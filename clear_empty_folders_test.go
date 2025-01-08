@@ -36,20 +36,8 @@ func TestClearEmptyFolder(t *testing.T) {
 	err = clearEmptyFolder(tempTestDataPath)
 	assert.NoError(t, err)
 
-	folderCount := 0
-
-	err = filepath.Walk(tempTestDataPath, func(currentPath string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
-			folderCount++
-		}
-
-		return nil
-	})
-	assert.NoError(t, err)
+	folderCount, fileCount := getFolderAndFileTotalCount(t, tempTestDataPath)
 
 	assert.Equal(t, 4, folderCount)
+	assert.Equal(t, 4, fileCount)
 }

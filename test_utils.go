@@ -32,3 +32,26 @@ func createTempTestDataPath(t *testing.T) string {
 
 	return tempTestDataPath
 }
+
+func getFolderAndFileTotalCount(t *testing.T, path string) (int, int) {
+	// filepath.Walk includes the root directory
+	folderCount := -1
+	fileCount := 0
+
+	err := filepath.Walk(path, func(currentPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			folderCount++
+		} else {
+			fileCount++
+		}
+
+		return nil
+	})
+
+	assert.NoError(t, err)
+	return folderCount, fileCount
+}
