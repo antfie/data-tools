@@ -38,4 +38,8 @@ func TestIntegration(t *testing.T) {
 
 	err = ctx.Zap(zapTestDataPath, false)
 	assert.NoError(t, err)
+
+	folderCount, fileCount := getFolderAndFileTotalCount(t, tempTestDataPath)
+	assert.Zero(t, folderCount)
+	assert.Zero(t, fileCount)
 }
