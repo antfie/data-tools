@@ -17,7 +17,6 @@ var pathForInputs = []string{
 }
 
 func TestGetPathsForMkdirs(t *testing.T) {
-
 	result := getPathsForMkdirs(pathForInputs)
 
 	var expected = []string{

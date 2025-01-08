@@ -21,16 +21,16 @@ func createEmptyTempTestDataPath(t *testing.T) string {
 }
 
 func createTempTestDataPath(t *testing.T) string {
-	tempTestDataPath := createEmptyTempTestDataPath(t)
+	testingDataDestinationPath := createEmptyTempTestDataPath(t)
 
-	testDataAbsolutePath, err := filepath.Abs(testDataPath)
+	testingDataSourcePath, err := filepath.Abs(testDataPath)
 	assert.NoError(t, err)
 
 	// Populate test data
-	err = CopyOrMoveFiles(testDataAbsolutePath, tempTestDataPath, false)
+	err = CopyOrMoveFiles(testingDataSourcePath, testingDataDestinationPath, false)
 	assert.NoError(t, err)
 
-	return tempTestDataPath
+	return testingDataDestinationPath
 }
 
 func getFolderAndFileTotalCount(t *testing.T, path string) (int, int) {
