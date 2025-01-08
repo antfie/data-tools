@@ -44,7 +44,7 @@ func (ctx *Context) HashFiles() error {
 		// Have we finished?
 		if files == nil {
 			if totalNewUniqueHashes > 0 {
-				utils.ConsoleAndLogPrintf("Total new and unique hashes found: %d, duplicate hashes found: %d", humanize.Comma(totalNewUniqueHashes), humanize.Comma(duplicateHashes))
+				utils.ConsoleAndLogPrintf("Total new and unique hashes found: %s, duplicate hashes found: %s", humanize.Comma(totalNewUniqueHashes), humanize.Comma(duplicateHashes))
 			}
 
 			return nil
