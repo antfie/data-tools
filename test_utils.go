@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/stretchr/testify/assert"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -34,16 +35,20 @@ func createTempTestDataPath(t *testing.T) string {
 }
 
 func getFolderAndFileTotalCount(t *testing.T, path string) (int, int) {
-	// filepath.Walk includes the root directory
-	folderCount := -1
+	folderCount := 0
 	fileCount := 0
 
-	err := filepath.Walk(path, func(currentPath string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if info.IsDir() {
+		// Ignore the root directory
+		if p == path {
+			return nil
+		}
+
+		if d.IsDir() {
 			folderCount++
 		} else {
 			fileCount++
