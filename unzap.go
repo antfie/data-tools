@@ -41,7 +41,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 	// Nothing to do
 	if info.ZappedFileHashes == 0 {
-		log.Print("No files to un-ZAP. Have you already ZAPped?")
+		utils.ConsoleAndLogPrintf("No files to un-ZAP. Have you already ZAPped?")
 		return nil
 	}
 
@@ -128,6 +128,7 @@ func (ctx *Context) unZapFile(orchestrator *utils.TaskOrchestrator, processedFil
 	if !IsFile(sourceFilePath) {
 		orchestrator.Lock()
 		log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
+		*processedFileIds = append(*processedFileIds, file.FileID)
 		*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
 		orchestrator.Unlock()
 
