@@ -178,28 +178,38 @@ LIMIT 		?
 }
 
 func QueryHashSanity() string {
-	return fmt.Sprintf(`
-SELECT      f.id file_id,
-            fh.id file_hash_id,
-            fh.hash,
-            fh.size,
-            ft.type,
-            %s
-FROM        files f
-JOIN        file_hashes fh ON f.file_hash_id = fh.id
-JOIN        main.file_types ft ON f.file_type_id = ft.id
-WHERE       (
-                SELECT  COUNT(f.id)
-                FROM    files f
-                WHERE f.file_hash_id = fh.id
-            ) > 1
-AND			f.zapped = 0
+	return `
+SELECT		group_concat(f.id) file_ids
+FROM 		file_hashes fh
+JOIN 		files f ON f.file_hash_id = fh.id
+JOIN        file_types ft ON ft.id = fh.file_type_id
+WHERE      	f.zapped = 0
 AND			f.deleted_at IS NULL
 AND			f.ignored = 0
 AND			fh.zapped = 0
 AND			fh.ignored = 0
-AND			fh.size IS NOT NULL
-AND			fh.file_type_id IS NOT NULL
-ORDER BY  	fh.id -- for deterministic result order
+GROUP BY	fh.id
+HAVING 		count(f.id) > 1
+ORDER BY	fh.id -- for deterministic result order
+`
+}
+
+func QueryFileForHashSanityByIDs() string {
+	return fmt.Sprintf(`
+SELECT      f.id file_id,
+    		fh.hash,
+    		fh.size,
+    		ft.type,
+            %s
+FROM        files f
+JOIN        file_hashes fh ON f.file_hash_id = fh.id
+JOIN        file_types ft ON f.file_type_id = ft.id
+WHERE      	f.zapped = 0
+AND			f.deleted_at IS NULL
+AND			f.ignored = 0
+AND			fh.zapped = 0
+AND			fh.ignored = 0
+AND			f.id IN ?
+ORDER BY	f.id -- for deterministic result order
 `, fileAbsolutePathCTEQuery)
 }

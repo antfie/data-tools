@@ -7,11 +7,11 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"log"
 	"os"
+	"strings"
 )
 
 type Sanity struct {
 	FileID       uint
-	FileHashID   uint
 	Hash         string
 	Size         int64
 	Type         string
@@ -19,45 +19,81 @@ type Sanity struct {
 }
 
 func (ctx *Context) DuplicateHashSanityCheck() error {
-	var filesToCheck []Sanity
-	result := ctx.DB.Raw(QueryHashSanity(), ctx.Config.BatchSize).Scan(&filesToCheck)
+	utils.ConsoleAndLogPrintf("Acquiring data")
+
+	var hashesToProcess []string
+	result := ctx.DB.Raw(QueryHashSanity()).Scan(&hashesToProcess)
 
 	if result.Error != nil {
 		return result.Error
 	}
 
+	fileCount, batchesOfFileIdsToProcess := createBatches(hashesToProcess, ctx)
+
 	// Nothing to do
-	if len(filesToCheck) == 0 {
-		utils.ConsoleAndLogPrintf("No files to check. Have you already hashed, sized and typed?")
+	if fileCount == 0 {
+		utils.ConsoleAndLogPrintf("No files to sanity check. Have you already hashed, sized and typed?")
 		return nil
 	}
 
-	count := int64(len(filesToCheck))
+	utils.ConsoleAndLogPrintf("Sanity checking %s", utils.Pluralize("file", fileCount))
 
-	utils.ConsoleAndLogPrintf("Sanity checking %s hashes", utils.Pluralize("file", count))
+	bar := progressbar.Default(fileCount)
 
-	bar := progressbar.Default(count)
-
-	var notFoundFileIDs []uint
-
-	orchestrator := utils.NewTaskOrchestrator(bar, len(filesToCheck), ctx.Config.MaxConcurrentFileOperations)
-
-	for _, file := range filesToCheck {
-		orchestrator.StartTask()
-		go ctx.sanityCheckFile(orchestrator, file, &notFoundFileIDs)
-	}
-
-	orchestrator.WaitForTasks()
-
-	if len(notFoundFileIDs) > 0 {
-		result = ctx.DB.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+	for _, batch := range batchesOfFileIdsToProcess {
+		var filesToCheck []Sanity
+		result := ctx.DB.Raw(QueryFileForHashSanityByIDs(), batch).Scan(&filesToCheck)
 
 		if result.Error != nil {
 			return result.Error
 		}
+
+		var notFoundFileIDs []uint
+
+		orchestrator := utils.NewTaskOrchestrator(bar, len(filesToCheck), ctx.Config.MaxConcurrentFileOperations)
+
+		for _, file := range filesToCheck {
+			orchestrator.StartTask()
+			go ctx.sanityCheckFile(orchestrator, file, &notFoundFileIDs)
+		}
+
+		orchestrator.WaitForTasks()
+
+		if len(notFoundFileIDs) > 0 {
+			result = ctx.DB.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+
+			if result.Error != nil {
+				return result.Error
+			}
+		}
 	}
 
 	return nil
+}
+
+func createBatches(hashesToProcess []string, ctx *Context) (int64, [][]string) {
+	count := int64(0)
+	var batchesOfFileIdsToProcess [][]string
+	batchIndex := -1
+	batchCount := int64(-1)
+
+	for _, hash := range hashesToProcess {
+		for _, fileId := range strings.Split(hash, ",") {
+			if batchCount == -1 || batchCount > ctx.Config.BatchSize-1 {
+				batchCount = 0
+				batchIndex++
+				batchesOfFileIdsToProcess = append(batchesOfFileIdsToProcess, []string{fileId})
+
+			} else {
+				batchesOfFileIdsToProcess[batchIndex] = append(batchesOfFileIdsToProcess[batchIndex], fileId)
+			}
+
+			count++
+			batchCount++
+		}
+	}
+
+	return count, batchesOfFileIdsToProcess
 }
 
 func (ctx *Context) sanityCheckFile(orchestrator *utils.TaskOrchestrator, file Sanity, notFoundFileIDs *[]uint) {
