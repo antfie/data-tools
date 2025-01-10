@@ -12,11 +12,8 @@ Disclaimer: I will not be responsible for any data loss caused by this tool.
 
 # Running Order
 
-1. `add_root /some/path`
-1. `crawl`
+1. `crawl /some/path`
 1. `hash`
-2. `size`
-1. `type`
 1. `zap`
 1. `unzap`
 

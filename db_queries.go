@@ -61,50 +61,6 @@ LIMIT 		?
 `, fileAbsolutePathCTEQuery)
 }
 
-func QueryUnSizedFileHashesWithLimit() string {
-	return fmt.Sprintf(`
-SELECT		fh.id file_hash_id,
-    		f.id file_id,
-			%s
-FROM 		file_hashes fh
-JOIN  		(
-				SELECT		f.id,
-							max(f.file_hash_id) AS file_hash_id -- for deterministic result order
-				FROM 		files f
-				WHERE		f.size IS NULL
-				AND			f.deleted_at IS NULL
-				AND			f.ignored = 0
-				GROUP BY 	f.file_hash_id
-  			) f ON f.file_hash_id = fh.id
-WHERE		fh.size IS NULL
-AND			fh.ignored = 0
-ORDER BY	fh.id -- for deterministic result order
-LIMIT 		?
-`, fileAbsolutePathCTEQuery)
-}
-
-func QueryUnTypedFileHashesWithLimit() string {
-	return fmt.Sprintf(`
-SELECT		fh.id file_hash_id,
-    		f.id file_id,
-			%s
-FROM 		file_hashes fh
-JOIN  		(
-				SELECT		f.id,
-							max(f.file_hash_id) AS file_hash_id -- for deterministic result order
-				FROM 		files f
-				WHERE		f.file_type_id IS NULL
-				AND			f.deleted_at IS NULL
-				AND			f.ignored = 0
-				GROUP BY 	f.file_hash_id
-  			) f ON f.file_hash_id = fh.id
-WHERE		fh.file_type_id IS NULL
-AND			fh.ignored = 0
-ORDER BY	fh.id -- for deterministic result order
-LIMIT 		?
-`, fileAbsolutePathCTEQuery)
-}
-
 func QueryGetFileHashesToZapWithLimit() string {
 	return fmt.Sprintf(`
 SELECT		fh.id file_hash_id,
@@ -177,39 +133,27 @@ LIMIT 		?
 `, fileAbsolutePathCTEQuery)
 }
 
-func QueryHashSanity() string {
+func QueryGetExistingHashSignatures() string {
 	return `
-SELECT		group_concat(f.id) file_ids
-FROM 		file_hashes fh
-JOIN 		files f ON f.file_hash_id = fh.id
-JOIN        file_types ft ON ft.id = fh.file_type_id
-WHERE      	f.zapped = 0
-AND			f.deleted_at IS NULL
-AND			f.ignored = 0
-AND			fh.zapped = 0
-AND			fh.ignored = 0
-GROUP BY	fh.id
-HAVING 		count(f.id) > 1
+SELECT		fh.id hash_id,
+    		fh.hash,
+        	fh.size,
+        	fh.file_type_id,
+        	ft.type file_type
+FROM		file_hashes fh
+JOIN        file_types ft ON fh.file_type_id = ft.id
+WHERE 		fh.hash IS NOT NULL
+AND 		fh.size IS NOT NULL
+AND 		fh.file_type_id IS NOT NULL
 ORDER BY	fh.id -- for deterministic result order
 `
 }
 
-func QueryFileForHashSanityByIDs() string {
-	return fmt.Sprintf(`
-SELECT      f.id file_id,
-    		fh.hash,
-    		fh.size,
-    		ft.type,
-            %s
-FROM        files f
-JOIN        file_hashes fh ON f.file_hash_id = fh.id
-JOIN        file_types ft ON f.file_type_id = ft.id
-WHERE      	f.zapped = 0
-AND			f.deleted_at IS NULL
-AND			f.ignored = 0
-AND			fh.zapped = 0
-AND			fh.ignored = 0
-AND			f.id IN ?
-ORDER BY	f.id -- for deterministic result order
-`, fileAbsolutePathCTEQuery)
+func QueryGetExistingFileTypes() string {
+	return `
+SELECT		id,
+        	type
+FROM		file_types
+ORDER BY	id -- for deterministic result order
+`
 }

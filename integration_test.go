@@ -4,6 +4,7 @@ import (
 	"data-tools/config"
 	"github.com/stretchr/testify/assert"
 	"os"
+	"path"
 	"testing"
 )
 
@@ -13,12 +14,15 @@ func TestIntegration(t *testing.T) {
 	defer os.RemoveAll(tempTestDataPath)
 	defer os.RemoveAll(zapTestDataPath)
 
+	c := &config.Config{
+		DBPath:                      path.Join(zapTestDataPath, "db.db"),
+		BatchSize:                   5,
+		MaxConcurrentFileOperations: 2,
+	}
+
 	ctx := &Context{
-		Config: &config.Config{
-			BatchSize:                   5,
-			MaxConcurrentFileOperations: 2,
-		},
-		DB: testDB(),
+		Config: c,
+		DB:     initDb(c),
 	}
 
 	err := ctx.AddRootPath(tempTestDataPath)
