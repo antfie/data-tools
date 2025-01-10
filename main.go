@@ -16,7 +16,7 @@ import (
 //goland:noinspection GoUnnecessarilyExportedIdentifiers
 var AppVersion = "6.0"
 
-var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  add_root\n  crawl\n  hash\n  size\n  type\n  duplicate_hash_sanity_check\n  zap\n  unzap\n"
+var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  crawl\n  hash\n  zap\n  unzap\n"
 
 //go:embed config.yaml
 var defaultConfigData []byte
@@ -64,26 +64,15 @@ func main() {
 
 func (ctx *Context) runCommand(command string) error {
 	switch command {
-	case "add_root":
+	case "crawl":
 		if len(os.Args) != 3 {
 			log.Fatal("add_root requires a root path.")
 		}
-		return ctx.AddRootPath(os.Args[2])
 
-	case "crawl":
-		return ctx.Crawl()
+		return ctx.Crawl(os.Args[2])
 
 	case "hash":
 		return ctx.HashFiles()
-
-	case "size":
-		return ctx.SizeFiles()
-
-	case "type":
-		return ctx.TypeFiles()
-
-	case "duplicate_hash_sanity_check":
-		return ctx.DuplicateHashSanityCheck()
 
 	case "zap":
 		if len(os.Args) != 3 {

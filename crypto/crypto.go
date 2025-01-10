@@ -47,7 +47,6 @@ func HashFile(filePath string) (string, error) {
 	}
 
 	// For 64 bytes of BLAKE2b hash data, we expect 87 to 88 characters of Base-58
-	// This results in a little reduction in storage use
-	// hex would be 128 characters (2 chars per byte)
+	// This results in a little reduction in storage use over hex, which would be 128 characters (2 chars per byte)
 	return base58.Encode(hash.Sum(nil)), err
 }

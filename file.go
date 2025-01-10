@@ -25,15 +25,31 @@ func IsFile(path string) bool {
 	return false
 }
 
-func GetTypeOfFile(file string) (string, error) {
-	command := exec.Command("file", "-b", "--mime-type", file)
+// file -b --mime-type test.db
+// application/vnd.sqlite3
+
+func GetFileType(filePath string) (string, error) {
+	command := exec.Command("file", "-b", "--mime-type", filePath)
 	output, err := command.Output()
 
 	if err != nil {
 		return "", err
 	}
 
-	return strings.TrimSpace(string(output)), nil
+	formatted := string(output)
+
+	// Deal with this type of scenario
+	// file -b --mime-type "/some/path/Widgets/HP Ink Widget.wdgt/HPInkWidget.widgetplugin/Contents/MacOS/InkWidgetTool"
+	// application/x-mach-binary
+	// /some/path/Widgets/HP Ink Widget.wdgt/HPInkWidget.widgetplugin/Contents/MacOS/InkWidgetTool (for architecture ppc):	application/x-mach-binary
+	// /some/path/Widgets/HP Ink Widget.wdgt/HPInkWidget.widgetplugin/Contents/MacOS/InkWidgetTool (for architecture i386):	application/x-mach-binary
+	if strings.Contains(formatted, "\n") {
+		formatted = strings.Split(formatted, "\n")[0]
+	}
+
+	formatted = strings.TrimSpace(formatted)
+
+	return formatted, nil
 }
 
 func sortFilePathsByLongest(filePaths []string) {

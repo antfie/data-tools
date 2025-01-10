@@ -9,11 +9,21 @@ import (
 	"github.com/schollz/progressbar/v3"
 	"gorm.io/gorm"
 	"log"
+	"os"
 )
+
+type HashSignature struct {
+	HashID     *uint
+	Hash       string
+	Size       uint
+	FileTypeID *uint
+	FileType   string
+	FileIDs    []uint
+}
 
 func (ctx *Context) HashFiles() error {
 	var count int64 = 0
-	result := ctx.DB.Model(&models.File{}).Where("deleted_at IS NULL AND file_hash_id IS NULL AND ignored = 0").Count(&count)
+	result := ctx.DB.Model(&models.File{}).Where("deleted_at IS NULL AND file_hash_id IS NULL AND size IS NULL AND file_type_id IS NULL AND ignored = 0").Count(&count)
 
 	if result.Error != nil {
 		return result.Error
@@ -27,10 +37,24 @@ func (ctx *Context) HashFiles() error {
 
 	utils.ConsoleAndLogPrintf("Hashing %s", utils.Pluralize("file", count))
 
+	var hashSignatures []HashSignature
+	result = ctx.DB.Raw(QueryGetExistingHashSignatures()).Scan(&hashSignatures)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	var existingFileTypes []models.FileType
+	result = ctx.DB.Raw(QueryGetExistingFileTypes()).Scan(&existingFileTypes)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
 	bar := progressbar.Default(count)
 
 	totalNewUniqueHashes := int64(0)
-	duplicateHashes := int64(0)
+	duplicateFileHashes := 0
 
 	// Do batches until there are no more
 	for {
@@ -44,87 +68,129 @@ func (ctx *Context) HashFiles() error {
 		// Have we finished?
 		if files == nil {
 			if totalNewUniqueHashes > 0 {
-				utils.ConsoleAndLogPrintf("Total new and unique hashes found: %s, duplicate hashes found: %s", humanize.Comma(totalNewUniqueHashes), humanize.Comma(duplicateHashes))
+				utils.ConsoleAndLogPrintf("Total new and unique file hashes found: %s, duplicate file hashes: %s", humanize.Comma(totalNewUniqueHashes), humanize.Comma(int64(duplicateFileHashes)))
 			}
 
 			return nil
 		}
 
-		hashes := make(map[string][]uint, len(files))
-		var uniqueHashes []string
 		var notFoundFileIDs []uint
 
 		orchestrator := utils.NewTaskOrchestrator(bar, len(files), ctx.Config.MaxConcurrentFileOperations)
 
 		for _, file := range files {
 			orchestrator.StartTask()
-			go hashFile(orchestrator, hashes, &uniqueHashes, &notFoundFileIDs, file)
+			go hashFile(orchestrator, &hashSignatures, &notFoundFileIDs, file)
 		}
 
 		orchestrator.WaitForTasks()
 
-		// Find existing hashes in the db
-		var existingDBHashes []models.FileHash
-		result = ctx.DB.Where("hash IN ?", uniqueHashes).Find(&existingDBHashes)
+		err := ctx.DB.Transaction(func(tx *gorm.DB) error {
+			for hashSignatureIndex, hashSignature := range hashSignatures {
+				// Try to resolve the file type ID if required
+				if hashSignature.FileTypeID == nil {
+					for _, fileType := range existingFileTypes {
+						if hashSignature.FileType == fileType.Type {
+							hashSignatures[hashSignatureIndex].FileTypeID = &fileType.ID
+							break
+						}
+					}
+				}
 
-		if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return result.Error
-		}
+				// Create a new FileType if required
+				if hashSignatures[hashSignatureIndex].FileTypeID == nil {
+					fileTypeModel := models.FileType{Type: hashSignature.FileType}
 
-		var newDBHashes []models.FileHash
-		for _, hash := range uniqueHashes {
-			if getDBHash(hash, existingDBHashes) == nil {
-				totalNewUniqueHashes++
-				newDBHashes = append(newDBHashes, models.FileHash{Hash: hash})
-			} else {
-				duplicateHashes++
+					result = tx.Create(&fileTypeModel)
+
+					if result.Error != nil {
+						return result.Error
+					}
+
+					hashSignatures[hashSignatureIndex].FileTypeID = &fileTypeModel.ID
+					existingFileTypes = append(existingFileTypes, fileTypeModel)
+				}
+
+				// Create a new FileHash if required
+				if hashSignature.HashID == nil {
+					model := models.FileHash{
+						Hash:       hashSignature.Hash,
+						FileTypeID: hashSignatures[hashSignatureIndex].FileTypeID,
+						Size:       &hashSignature.Size,
+					}
+
+					result = tx.Create(&model)
+					totalNewUniqueHashes++
+
+					if len(hashSignature.FileIDs) > 1 {
+						duplicateFileHashes += len(hashSignature.FileIDs) - 1
+					}
+
+					if result.Error != nil {
+						return result.Error
+					}
+
+					hashSignatures[hashSignatureIndex].HashID = &model.ID
+				} else {
+					duplicateFileHashes += len(hashSignature.FileIDs)
+				}
+
+				for _, fileID := range hashSignature.FileIDs {
+					result = tx.Model(&models.File{}).Where("id = ?", fileID).Updates(models.File{
+						FileHashID: hashSignatures[hashSignatureIndex].HashID,
+						Size:       &hashSignature.Size,
+						FileTypeID: hashSignatures[hashSignatureIndex].FileTypeID,
+					})
+
+					if result.Error != nil {
+						return result.Error
+					}
+				}
 			}
-		}
 
-		if len(newDBHashes) > 0 {
-			// Insert new hashes if required
-			result = ctx.DB.Create(&newDBHashes)
+			if len(notFoundFileIDs) > 0 {
+				result = tx.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
 
-			if result.Error != nil {
-				return result.Error
+				if result.Error != nil {
+					return result.Error
+				}
 			}
 
-			existingDBHashes = append(existingDBHashes, newDBHashes...)
-		}
+			return nil
+		})
 
-		for hash, fileIds := range hashes {
-			dbHash := getDBHash(hash, existingDBHashes)
-
-			if dbHash == nil {
-				return ErrCouldNotResolveHash
-			}
-
-			result = ctx.DB.Model(&models.File{}).Where("id IN ?", fileIds).Updates(models.File{
-				FileHashID: &dbHash.ID,
-			})
-
-			if result.Error != nil {
-				return result.Error
-			}
-		}
-
-		if len(notFoundFileIDs) > 0 {
-			result = ctx.DB.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
-
-			if result.Error != nil {
-				return result.Error
-			}
+		if err != nil {
+			return err
 		}
 	}
 }
 
-func hashFile(orchestrator *utils.TaskOrchestrator, hashes map[string][]uint, uniqueHashes *[]string, notFoundFileIDs *[]uint, file FileIdAndPath) {
+func hashFile(orchestrator *utils.TaskOrchestrator, existingHashSignatures *[]HashSignature, notFoundFileIDs *[]uint, file FileIdAndPath) {
+	fileInfo, err := os.Stat(file.AbsolutePath)
+
 	// If the file does not exist we can ignore it
-	if !IsFile(file.AbsolutePath) {
-		orchestrator.Lock()
-		log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
-		*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
-		orchestrator.Unlock()
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
+
+			orchestrator.Lock()
+			*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
+			orchestrator.Unlock()
+
+			orchestrator.FinishTask()
+			return
+		}
+
+		log.Printf("Error: Could not open file \"%s\": %v", file.AbsolutePath, err)
+		orchestrator.FinishTask()
+		return
+	}
+
+	// Do file typing first to fail faster if there is a file issue
+	fileType, err := GetFileType(file.AbsolutePath)
+
+	if err != nil {
+		log.Printf("Error: Could not type file \"%s\": %v", file.AbsolutePath, err)
 
 		orchestrator.FinishTask()
 		return
@@ -133,30 +199,61 @@ func hashFile(orchestrator *utils.TaskOrchestrator, hashes map[string][]uint, un
 	hash, err := crypto.HashFile(file.AbsolutePath)
 
 	if err != nil {
-		log.Fatalf("Could not hash file \"%s\": %v", file.AbsolutePath, err)
+		log.Printf("Error: Could not hash file \"%s\": %v", file.AbsolutePath, err)
+
+		orchestrator.FinishTask()
+		return
+	}
+
+	size := fileInfo.Size()
+
+	// Ensure we have not wrapped around for uint conversion
+	if size < 0 {
+		log.Printf("Error: Negative file size \"%s\"", file.AbsolutePath)
+
+		orchestrator.FinishTask()
+		return
+	}
+
+	signature := HashSignature{
+		Hash:     hash,
+		Size:     uint(size),
+		FileType: fileType,
+		FileIDs:  []uint{file.FileID},
 	}
 
 	// Maps are not threadsafe
 	orchestrator.Lock()
-	existingFileIdsWithThisHash, found := hashes[hash]
 
-	if !found {
-		hashes[hash] = []uint{file.FileID}
-		*uniqueHashes = append(*uniqueHashes, hash)
-	} else {
-		hashes[hash] = append(existingFileIdsWithThisHash, file.FileID)
-	}
-	orchestrator.Unlock()
+	for existingHashSignatureIndex, existingHashSignature := range *existingHashSignatures {
+		if existingHashSignature.Hash == signature.Hash {
+			// Do hash collision detection on the found hash
+			if existingHashSignature.Size != signature.Size {
+				log.Printf("File \"%s\" has unexpected size. Expected %d, got %d. Has a hash collision occured?", file.AbsolutePath, existingHashSignature.Size, signature.Size)
+				orchestrator.Unlock()
 
-	orchestrator.FinishTask()
-}
+				orchestrator.FinishTask()
+				return
+			}
 
-func getDBHash(hash string, hashes []models.FileHash) *models.FileHash {
-	for _, dbHash := range hashes {
-		if hash == dbHash.Hash {
-			return &dbHash
+			if existingHashSignature.FileType != signature.FileType {
+				log.Printf("File \"%s\" has unexpected type. Expected \"%s\", got \"%s\". Has a hash collision occured?", file.AbsolutePath, existingHashSignature.FileType, signature.FileType)
+				orchestrator.Unlock()
+
+				orchestrator.FinishTask()
+				return
+			}
+
+			(*existingHashSignatures)[existingHashSignatureIndex].FileIDs = append(existingHashSignature.FileIDs, file.FileID)
+			orchestrator.Unlock()
+
+			orchestrator.FinishTask()
+			return
 		}
 	}
 
-	return nil
+	*existingHashSignatures = append(*existingHashSignatures, signature)
+	orchestrator.Unlock()
+
+	orchestrator.FinishTask()
 }

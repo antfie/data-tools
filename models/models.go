@@ -23,13 +23,6 @@ type Path struct {
 	DeletedAt      gorm.DeletedAt
 }
 
-type Root struct {
-	gorm.Model
-	PathID  uint
-	Path    Path
-	Ignored bool
-}
-
 type FileType struct {
 	ID   uint   `gorm:"primarykey"`
 	Type string `gorm:"unique"`
@@ -77,14 +70,6 @@ type PathNote struct {
 	gorm.Model
 	PathID uint
 	Path   Path
-	NoteId uint
-	Note   Note
-}
-
-type RootNote struct {
-	gorm.Model
-	RootID uint
-	Root   Root
 	NoteId uint
 	Note   Note
 }

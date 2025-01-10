@@ -40,7 +40,19 @@ func connect(dsn string, gormConfig *gorm.Config) *gorm.DB {
 		log.Fatalf("failed to connect to the database: %v", err)
 	}
 
-	err = db.AutoMigrate(&models.Path{}, &models.Root{}, &models.File{})
+	err = db.AutoMigrate(
+		&models.PathHash{},
+		&models.Path{},
+		&models.FileType{},
+		&models.FileHash{},
+		&models.File{},
+		&models.Note{},
+		&models.PathHashNote{},
+		&models.PathNote{},
+		&models.FileTypeNote{},
+		&models.FileHashNote{},
+		&models.FileNote{},
+	)
 
 	if err != nil {
 		log.Fatalf("failed to migrate the database")
