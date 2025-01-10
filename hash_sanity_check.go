@@ -109,9 +109,11 @@ func (ctx *Context) sanityCheckFile(orchestrator *utils.TaskOrchestrator, file S
 
 			orchestrator.FinishTask()
 			return
-		} else {
-			log.Fatalf("Could not open file \"%s\": %v", file.AbsolutePath, err)
 		}
+
+		log.Printf("Error: Could not open file \"%s\": %v", file.AbsolutePath, err)
+		orchestrator.FinishTask()
+		return
 	}
 
 	size := info.Size()
@@ -120,7 +122,7 @@ func (ctx *Context) sanityCheckFile(orchestrator *utils.TaskOrchestrator, file S
 		log.Printf("File \"%s\" has incorrect size. Expected %d, got %d", file.AbsolutePath, file.Size, size)
 	}
 
-	fileType, err := GetTypeOfFile(file.AbsolutePath)
+	fileType, err := GetFileType(file.AbsolutePath)
 
 	if err != nil {
 		log.Fatalf("Could not type file \"%s\": %v", file.AbsolutePath, err)

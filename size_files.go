@@ -109,9 +109,11 @@ func (ctx *Context) sizeFile(orchestrator *utils.TaskOrchestrator, file FileHash
 
 			orchestrator.FinishTask()
 			return
-		} else {
-			log.Fatalf("Could not open file \"%s\": %v", file.AbsolutePath, err)
 		}
+		
+		log.Printf("Could not open file \"%s\": %v", file.AbsolutePath, err)
+		orchestrator.FinishTask()
+		return
 	}
 
 	size := info.Size()

@@ -139,7 +139,7 @@ func typeFile(orchestrator *utils.TaskOrchestrator, fileHashAndFile FileHashAndF
 		return
 	}
 
-	fileType, err := GetTypeOfFile(fileHashAndFile.AbsolutePath)
+	fileType, err := GetFileType(fileHashAndFile.AbsolutePath)
 
 	if err != nil {
 		log.Fatalf("Could not type file \"%s\": %v", fileHashAndFile.AbsolutePath, err)
