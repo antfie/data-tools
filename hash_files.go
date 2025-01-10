@@ -18,7 +18,12 @@ type HashSignature struct {
 	Size       uint
 	FileTypeID *uint
 	FileType   string
-	FileIDs    []uint
+	fileIDs    []uint // This is not exported to prevent GORM from trying to map it
+}
+
+type FileIdAndPath struct {
+	FileID       uint
+	AbsolutePath string
 }
 
 func (ctx *Context) HashFiles() error {
@@ -35,7 +40,7 @@ func (ctx *Context) HashFiles() error {
 		return nil
 	}
 
-	utils.ConsoleAndLogPrintf("Hashing %s", utils.Pluralize("file", count))
+	utils.ConsoleAndLogPrintf("Acquiring data")
 
 	var hashSignatures []HashSignature
 	result = ctx.DB.Raw(QueryGetExistingHashSignatures()).Scan(&hashSignatures)
@@ -50,6 +55,8 @@ func (ctx *Context) HashFiles() error {
 	if result.Error != nil {
 		return result.Error
 	}
+
+	utils.ConsoleAndLogPrintf("Hashing %s", utils.Pluralize("file", count))
 
 	bar := progressbar.Default(count)
 
@@ -122,8 +129,8 @@ func (ctx *Context) HashFiles() error {
 					result = tx.Create(&model)
 					totalNewUniqueHashes++
 
-					if len(hashSignature.FileIDs) > 1 {
-						duplicateFileHashes += len(hashSignature.FileIDs) - 1
+					if len(hashSignature.fileIDs) > 1 {
+						duplicateFileHashes += len(hashSignature.fileIDs) - 1
 					}
 
 					if result.Error != nil {
@@ -132,10 +139,10 @@ func (ctx *Context) HashFiles() error {
 
 					hashSignatures[hashSignatureIndex].HashID = &model.ID
 				} else {
-					duplicateFileHashes += len(hashSignature.FileIDs)
+					duplicateFileHashes += len(hashSignature.fileIDs)
 				}
 
-				for _, fileID := range hashSignature.FileIDs {
+				for _, fileID := range hashSignature.fileIDs {
 					result = tx.Model(&models.File{}).Where("id = ?", fileID).Updates(models.File{
 						FileHashID: hashSignatures[hashSignatureIndex].HashID,
 						Size:       &hashSignature.Size,
@@ -219,7 +226,7 @@ func hashFile(orchestrator *utils.TaskOrchestrator, existingHashSignatures *[]Ha
 		Hash:     hash,
 		Size:     uint(size),
 		FileType: fileType,
-		FileIDs:  []uint{file.FileID},
+		fileIDs:  []uint{file.FileID},
 	}
 
 	// Maps are not threadsafe
@@ -244,7 +251,7 @@ func hashFile(orchestrator *utils.TaskOrchestrator, existingHashSignatures *[]Ha
 				return
 			}
 
-			(*existingHashSignatures)[existingHashSignatureIndex].FileIDs = append(existingHashSignature.FileIDs, file.FileID)
+			(*existingHashSignatures)[existingHashSignatureIndex].fileIDs = append(existingHashSignature.fileIDs, file.FileID)
 			orchestrator.Unlock()
 
 			orchestrator.FinishTask()
