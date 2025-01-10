@@ -10,6 +10,7 @@ file_names_to_ignore:
 folder_names_to_ignore:
   - "@eaDir"                # Synology
   - "@__thumb"              # QNAP
+  - .@__thumb               # QNAP
   - .Trashes                # macOS
   - .TemporaryItems         # macOS
   - .DocumentRevisions-V100 # macOS
