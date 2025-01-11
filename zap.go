@@ -4,6 +4,8 @@ import (
 	"data-tools/models"
 	"data-tools/utils"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/dustin/go-humanize"
 	"github.com/schollz/progressbar/v3"
@@ -33,7 +35,8 @@ func (ctx *Context) Zap(outputPath string, safeMode bool) error {
 		return err
 	}
 
-	return ctx.removeEmptyZappedFolders(safeMode)
+	//return ctx.removeEmptyZappedFolders(safeMode)
+	return err
 }
 
 func (ctx *Context) copyDeduplicatedFiles(outputPath string, safeMode bool) error {
@@ -66,7 +69,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 		return err
 	}
 
-	err = os.MkdirAll(outputPathAbs, 0700)
+	err = createZapDirectoryStructure(outputPathAbs)
 
 	if err != nil {
 		return err
@@ -126,7 +129,7 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 	// ZAP
 
 	// TODO: for collision detection, no do not compare the files. If file with same hash then consider it the same, no need to re-hash, just ignore, move on
-	err := CopyOrMoveFile(file.AbsolutePath, path.Join(zapBasePath, hexFileName), move)
+	err := CopyOrMoveFile(file.AbsolutePath, path.Join(zapBasePath, hexFileName[:2], hexFileName[2:4], hexFileName[4:]), move)
 
 	if err != nil {
 		log.Fatalf("Could not ZAP file \"%s\": %v", file.AbsolutePath, err)
@@ -255,4 +258,42 @@ func (ctx *Context) removeEmptyZappedFolders(safeMode bool) error {
 	}
 
 	return clearEmptyFolders(foldersToProcess)
+}
+
+func createZapDirectoryStructure(absoluteBasePath string) error {
+	info, err := os.Stat(absoluteBasePath)
+
+	if info != nil || !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	utils.ConsoleAndLogPrintf("Creating ZAP data structure")
+
+	err = os.Mkdir(absoluteBasePath, 0700)
+
+	if err != nil {
+		return err
+	}
+
+	for x := 0; x < 0x100; x++ {
+		pathX := path.Join(absoluteBasePath, fmt.Sprintf("%02x", x))
+
+		err = os.Mkdir(pathX, 0700)
+
+		if err != nil {
+			return err
+		}
+
+		for y := 0; y < 0x100; y++ {
+			pathY := path.Join(pathX, fmt.Sprintf("%02x", y))
+
+			err = os.Mkdir(pathY, 0700)
+
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

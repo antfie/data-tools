@@ -75,11 +75,7 @@ func (ctx *Context) runCommand(command string) error {
 		return ctx.HashFiles()
 
 	case "zap":
-		if len(os.Args) != 3 {
-			log.Fatal("zap requires a destination path.")
-		}
-
-		return ctx.Zap(os.Args[2], false)
+		return ctx.Zap(ctx.Config.ZapDataPath, false)
 
 	case "unzap":
 		if len(os.Args) != 4 {
