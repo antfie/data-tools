@@ -62,6 +62,8 @@ func (ctx *Context) HashFiles() error {
 
 	totalNewUniqueHashes := int64(0)
 	duplicateFileHashes := 0
+	totalFileSize := uint(0)
+	duplicateFileSize := uint(0)
 
 	// Do batches until there are no more
 	for {
@@ -74,10 +76,7 @@ func (ctx *Context) HashFiles() error {
 
 		// Have we finished?
 		if files == nil {
-			if totalNewUniqueHashes > 0 {
-				utils.ConsoleAndLogPrintf("Total new and unique file hashes found: %s, duplicate file hashes: %s", humanize.Comma(totalNewUniqueHashes), humanize.Comma(int64(duplicateFileHashes)))
-			}
-
+			utils.ConsoleAndLogPrintf("Processed %s. Total new and unique file hashes found: %s, duplicate file hashes: %s (%s)", humanize.Bytes(uint64(totalFileSize)), humanize.Comma(totalNewUniqueHashes), humanize.Comma(int64(duplicateFileHashes)), humanize.Bytes(uint64(duplicateFileSize)))
 			return nil
 		}
 
@@ -131,6 +130,7 @@ func (ctx *Context) HashFiles() error {
 
 					if len(hashSignature.fileIDs) > 1 {
 						duplicateFileHashes += len(hashSignature.fileIDs) - 1
+						duplicateFileSize += hashSignature.Size * uint(len(hashSignature.fileIDs)-1)
 					}
 
 					if result.Error != nil {
@@ -140,7 +140,10 @@ func (ctx *Context) HashFiles() error {
 					hashSignatures[hashSignatureIndex].HashID = &model.ID
 				} else {
 					duplicateFileHashes += len(hashSignature.fileIDs)
+					duplicateFileSize += hashSignature.Size * uint(len(hashSignature.fileIDs))
 				}
+
+				totalFileSize += hashSignature.Size * uint(len(hashSignature.fileIDs))
 
 				for _, fileID := range hashSignature.fileIDs {
 					result = tx.Model(&models.File{}).Where("id = ?", fileID).Updates(models.File{
