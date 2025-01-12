@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/dustin/go-humanize"
 	"github.com/schollz/progressbar/v3"
+	"gorm.io/gorm"
 	"log"
 	"os"
 	"path"
@@ -135,20 +136,29 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 		log.Fatalf("Could not ZAP file \"%s\": %v", file.AbsolutePath, err)
 	}
 
-	result := ctx.DB.Model(&models.FileHash{}).Where("id = ?", file.FileHashID).Updates(models.FileHash{
-		Zapped: true,
+	// TODO: this should be collected and done as part of the DB batch, not here
+	err = ctx.DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.FileHash{}).Where("id = ?", file.FileHashID).Updates(models.FileHash{
+			Zapped: true,
+		})
+
+		if result.Error != nil {
+			log.Fatalf("DB Error: %v", result.Error)
+		}
+
+		result = tx.Model(&models.File{}).Where("id = ?", file.FileID).Updates(models.File{
+			Zapped: true,
+		})
+
+		if result.Error != nil {
+			log.Fatalf("DB Error: %v", result.Error)
+		}
+
+		return nil
 	})
 
-	if result.Error != nil {
-		log.Fatalf("DB Error: %v", result.Error)
-	}
-
-	result = ctx.DB.Model(&models.File{}).Where("id = ?", file.FileID).Updates(models.File{
-		Zapped: true,
-	})
-
-	if result.Error != nil {
-		log.Fatalf("DB Error: %v", result.Error)
+	if err != nil {
+		log.Fatalf("DB Error: %v", err)
 	}
 
 	orchestrator.FinishTask()
