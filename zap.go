@@ -96,20 +96,58 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 			return nil
 		}
 
+		var zappedFileHashIds []uint
+		var zappedFileIds []uint
 		var notFoundFileIDs []uint
 
 		orchestrator := utils.NewTaskOrchestrator(bar, len(fileHashesToZap), ctx.Config.MaxConcurrentFileOperations)
 
 		for _, fileHash := range fileHashesToZap {
 			orchestrator.StartTask()
-			go ctx.zapFile(orchestrator, safeMode, outputPathAbs, fileHash, &notFoundFileIDs)
+			go ctx.zapFile(orchestrator, safeMode, outputPathAbs, fileHash, &zappedFileHashIds, &zappedFileIds, &notFoundFileIDs)
 		}
 
 		orchestrator.WaitForTasks()
+
+		err = ctx.DB.Transaction(func(tx *gorm.DB) error {
+			if len(zappedFileHashIds) > 0 {
+				result = tx.Where("id IN ?", zappedFileHashIds).Updates(models.FileHash{
+					Zapped: true,
+				})
+
+				if result.Error != nil {
+					return result.Error
+				}
+			}
+
+			if len(zappedFileIds) > 0 {
+				result = tx.Where("id IN ?", zappedFileIds).Updates(models.File{
+					Zapped: true,
+				})
+
+				if result.Error != nil {
+					return result.Error
+				}
+			}
+
+			if len(notFoundFileIDs) > 0 {
+				result = tx.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+
+				if result.Error != nil {
+					return result.Error
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			log.Fatalf("DB Error: %v", err)
+		}
 	}
 }
 
-func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool, zapBasePath string, file ZapResult, notFoundFileIDs *[]uint) {
+func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool, zapBasePath string, file ZapResult, zappedFileHashIds, zappedFileIds, notFoundFileIDs *[]uint) {
 	// If the file does not exist we can ignore it
 	if !IsFile(file.AbsolutePath) {
 		orchestrator.Lock()
@@ -136,30 +174,10 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 		log.Fatalf("Could not ZAP file \"%s\": %v", file.AbsolutePath, err)
 	}
 
-	// TODO: this should be collected and done as part of the DB batch, not here
-	err = ctx.DB.Transaction(func(tx *gorm.DB) error {
-		result := tx.Model(&models.FileHash{}).Where("id = ?", file.FileHashID).Updates(models.FileHash{
-			Zapped: true,
-		})
-
-		if result.Error != nil {
-			log.Fatalf("DB Error: %v", result.Error)
-		}
-
-		result = tx.Model(&models.File{}).Where("id = ?", file.FileID).Updates(models.File{
-			Zapped: true,
-		})
-
-		if result.Error != nil {
-			log.Fatalf("DB Error: %v", result.Error)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		log.Fatalf("DB Error: %v", err)
-	}
+	orchestrator.Lock()
+	*zappedFileHashIds = append(*zappedFileHashIds, file.FileHashID)
+	*zappedFileIds = append(*zappedFileIds, file.FileID)
+	orchestrator.Unlock()
 
 	orchestrator.FinishTask()
 }
@@ -203,26 +221,45 @@ AND			fh.ignored = 0
 
 		orchestrator := utils.NewTaskOrchestrator(bar, len(duplicateFilesToRemove), ctx.Config.MaxConcurrentFileOperations)
 
+		var zappedFileIds []uint
 		var notFoundFileIDs []uint
 
 		for _, file := range duplicateFilesToRemove {
 			orchestrator.StartTask()
-			go ctx.removeDuplicateFile(orchestrator, safeMode, file, &notFoundFileIDs)
+			go ctx.removeDuplicateFile(orchestrator, safeMode, file, &zappedFileIds, &notFoundFileIDs)
 		}
 
 		orchestrator.WaitForTasks()
 
-		if len(notFoundFileIDs) > 0 {
-			result = ctx.DB.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+		err := ctx.DB.Transaction(func(tx *gorm.DB) error {
+			if len(zappedFileIds) > 0 {
+				result = tx.Where("id IN ?", zappedFileIds).Updates(models.File{
+					Zapped: true,
+				})
 
-			if result.Error != nil {
-				return result.Error
+				if result.Error != nil {
+					return result.Error
+				}
 			}
+
+			if len(notFoundFileIDs) > 0 {
+				result = tx.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+
+				if result.Error != nil {
+					return result.Error
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			log.Fatalf("DB Error: %v", err)
 		}
 	}
 }
 
-func (ctx *Context) removeDuplicateFile(orchestrator *utils.TaskOrchestrator, safeMode bool, file FileIdAndPath, notFoundFileIDs *[]uint) {
+func (ctx *Context) removeDuplicateFile(orchestrator *utils.TaskOrchestrator, safeMode bool, file FileIdAndPath, zappedFileIds, notFoundFileIDs *[]uint) {
 	// If the file does not exist we can ignore it
 	if !IsFile(file.AbsolutePath) {
 		orchestrator.Lock()
@@ -242,13 +279,9 @@ func (ctx *Context) removeDuplicateFile(orchestrator *utils.TaskOrchestrator, sa
 		}
 	}
 
-	result := ctx.DB.Model(&models.File{}).Where("id = ?", file.FileID).Updates(models.File{
-		Zapped: true,
-	})
-
-	if result.Error != nil {
-		log.Fatalf("DB Error: %v", result.Error)
-	}
+	orchestrator.Lock()
+	*zappedFileIds = append(*zappedFileIds, file.FileID)
+	orchestrator.Unlock()
 
 	orchestrator.FinishTask()
 }
