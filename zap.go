@@ -29,7 +29,7 @@ func (ctx *Context) Zap(outputPath string, safeMode bool) error {
 		return err
 	}
 
-	err = ctx.removeDuplicates(safeMode)
+	//err = ctx.removeDuplicates(safeMode)
 
 	if err != nil {
 		return err
