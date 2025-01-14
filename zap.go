@@ -168,7 +168,8 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 	// ZAP
 
 	// TODO: for collision detection, no do not compare the files. If file with same hash then consider it the same, no need to re-hash, just ignore, move on
-	err := CopyOrMoveFile(file.AbsolutePath, path.Join(zapBasePath, hexFileName[:2], hexFileName[2:4], hexFileName[4:]), move)
+	destinationPath := path.Join(zapBasePath, hexFileName[:2], hexFileName[2:4], hexFileName[4:])
+	err := CopyOrMoveFile(file.AbsolutePath, destinationPath, move)
 
 	if err != nil {
 		log.Fatalf("Could not ZAP file \"%s\": %v", file.AbsolutePath, err)
