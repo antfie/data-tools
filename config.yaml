@@ -1,7 +1,7 @@
 debug: false
 db_path: data.db
 log_file_path: data-tools.log
-zap_data_path: "/Volumes/OLD_Backup/ZAP2"
+zap_data_path: "ZAP"
 batch_size: 1000
 max_concurrent_file_operations: 10
 
