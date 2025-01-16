@@ -139,3 +139,7 @@ func GetAllFiles(rootPath string) ([]string, error) {
 func osMkdir(path string) error {
 	return os.Mkdir(path, 0700)
 }
+
+func osMkdirAll(path string) error {
+	return os.MkdirAll(path, 0700)
+}
