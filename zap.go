@@ -30,7 +30,7 @@ func (ctx *Context) Zap(outputPath string, safeMode bool) error {
 		return err
 	}
 
-	//err = ctx.removeDuplicates(safeMode)
+	err = ctx.removeDuplicates(safeMode)
 
 	if err != nil {
 		return err
@@ -275,7 +275,7 @@ func (ctx *Context) removeDuplicateFile(orchestrator *utils.TaskOrchestrator, sa
 	if !safeMode {
 		err := os.Remove(file.AbsolutePath)
 
-		if err != nil {
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			log.Fatalf("Could not remove file \"%s\": %v", file.AbsolutePath, err)
 		}
 	}
@@ -301,37 +301,39 @@ func (ctx *Context) removeEmptyZappedFolders(safeMode bool) error {
 		return nil
 	}
 
-	return clearEmptyFolders(foldersToProcess)
+	return ClearEmptyFolders(foldersToProcess)
 }
 
+// This will create 65,536 'buckets' in which to store the data from 00/00 to ff/ff
 func createZapDirectoryStructure(absoluteBasePath string) error {
 	info, err := os.Stat(absoluteBasePath)
 
+	// If a folder already exists at this location we assume the Zap structure has already been created
 	if info != nil || !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
 	utils.ConsoleAndLogPrintf("Creating ZAP data structure")
 
-	err = os.Mkdir(absoluteBasePath, 0700)
+	err = osMkdir(absoluteBasePath)
 
 	if err != nil {
 		return err
 	}
 
-	for x := 0; x < 0x100; x++ {
-		pathX := path.Join(absoluteBasePath, fmt.Sprintf("%02x", x))
+	for level1 := 0; level1 < 0x100; level1++ {
+		level1Path := path.Join(absoluteBasePath, fmt.Sprintf("%02x", level1))
 
-		err = os.Mkdir(pathX, 0700)
+		err = osMkdir(level1Path)
 
 		if err != nil {
 			return err
 		}
 
-		for y := 0; y < 0x100; y++ {
-			pathY := path.Join(pathX, fmt.Sprintf("%02x", y))
+		for level2 := 0; level2 < 0x100; level2++ {
+			level2Path := path.Join(level1Path, fmt.Sprintf("%02x", level2))
 
-			err = os.Mkdir(pathY, 0700)
+			err = osMkdir(level2Path)
 
 			if err != nil {
 				return err
@@ -340,4 +342,8 @@ func createZapDirectoryStructure(absoluteBasePath string) error {
 	}
 
 	return nil
+}
+
+func osMkdir(path string) error {
+	return os.Mkdir(path, 0700)
 }
