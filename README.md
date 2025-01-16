@@ -30,3 +30,7 @@ Note that empty folders will not be created when un-ZAP-ping, should you desire 
 ## How Can I Support This?
 
 We welcome fixes, features and donations.
+
+# Synology
+
+We need to set CGO_ENABLED=0  and use "github.com/glebarez/sqlite" instead of "gorm.io/driver/sqlite" which is a little less performant.

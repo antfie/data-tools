@@ -16,7 +16,7 @@ import (
 //goland:noinspection GoUnnecessarilyExportedIdentifiers
 var AppVersion = "6.0"
 
-var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  crawl\n  hash\n  zap\n  unzap\n"
+var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  crawl\n  hash\n  zap\n  unzap\n  copy_zaps\n  clear_empty_folders\n"
 
 //go:embed config.yaml
 var defaultConfigData []byte
@@ -79,10 +79,23 @@ func (ctx *Context) runCommand(command string) error {
 
 	case "unzap":
 		if len(os.Args) != 4 {
-			log.Fatal("unzap requires a source and destination path.")
+			log.Fatal("unzap requires source and destination paths.")
 		}
 
 		return ctx.UnZap(os.Args[2], os.Args[3])
+
+	case "copy_zaps":
+		if len(os.Args) != 4 {
+			log.Fatal("copy_zaps requires source and destination paths.")
+		}
+		return CopyZaps(os.Args[2], os.Args[3])
+
+	case "clear_empty_folders":
+		if len(os.Args) != 3 {
+			log.Fatal("clear_empty_folders requires a path.")
+		}
+
+		return ClearEmptyFolders([]string{os.Args[2]})
 	}
 
 	return errors.New(fmt.Sprintf("Command \"%s\" not recognised. %s", command, usageText))
