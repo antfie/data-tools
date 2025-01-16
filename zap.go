@@ -343,7 +343,3 @@ func createZapDirectoryStructure(absoluteBasePath string) error {
 
 	return nil
 }
-
-func osMkdir(path string) error {
-	return os.Mkdir(path, 0700)
-}
