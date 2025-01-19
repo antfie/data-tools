@@ -6,4 +6,6 @@ coverage.html
 dist
 *.log
 *.db
+*.db-shm
+*.db-wal
 private
