@@ -3,7 +3,6 @@ package main
 import (
 	"data-tools/config"
 	"data-tools/models"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"log"
@@ -30,14 +29,19 @@ func testDB() *gorm.DB {
 		Logger: logger.Default.LogMode(logger.Info),
 	}
 
-	return connect("file::memory:?cache=shared", gormConfig)
+	return connect("file::memory:", gormConfig)
 }
 
 func connect(dsn string, gormConfig *gorm.Config) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(dsn), gormConfig)
+	db, err := GetDriver(dsn, gormConfig)
 
 	if err != nil {
 		log.Fatalf("failed to connect to the database: %v", err)
+	}
+
+	// From: https://github.com/rails/rails/blob/8c7e39497f069e354d67ed14c63fa31383871e5d/activerecord/lib/active_record/connection_adapters/sqlite3_adapter.rb#L107
+	if res := db.Exec("PRAGMA foreign_keys = ON;PRAGMA journal_mode = WAL;PRAGMA synchronous = NORMAL;PRAGMA mmap_size = 134217728;PRAGMA journal_size_limit = 67108864;PRAGMA cache_size = 2000", nil); res.Error != nil {
+		log.Fatalf("failed to configure the database: %v", res.Error)
 	}
 
 	err = db.AutoMigrate(
