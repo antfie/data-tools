@@ -75,7 +75,7 @@ func (ctx *Context) HashFiles() error {
 		}
 
 		// Have we finished?
-		if files == nil {
+		if len(files) == 0 {
 			utils.ConsoleAndLogPrintf("Processed %s. Total new and unique file hashes found: %s, duplicate file hashes: %s (%s)", humanize.Bytes(uint64(totalFileSize)), humanize.Comma(totalNewUniqueHashes), humanize.Comma(int64(duplicateFileHashes)), humanize.Bytes(uint64(duplicateFileSize)))
 			return nil
 		}
@@ -129,8 +129,14 @@ func (ctx *Context) HashFiles() error {
 					totalNewUniqueHashes++
 
 					if len(hashSignature.fileIDs) > 1 {
-						duplicateFileHashes += len(hashSignature.fileIDs) - 1
-						duplicateFileSize += hashSignature.Size * uint(len(hashSignature.fileIDs)-1)
+						duplicateCountAsInt := len(hashSignature.fileIDs) - 1
+
+						duplicateFileHashes += duplicateCountAsInt
+
+						// Ensure we have not wrapped around for uint conversion, prevent CWE-190
+						if duplicateCountAsInt > 0 {
+							duplicateFileSize += hashSignature.Size * uint(duplicateCountAsInt)
+						}
 					}
 
 					if result.Error != nil {
