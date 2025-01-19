@@ -65,7 +65,7 @@ func (ctx *Context) crawlRootPath(rootPath models.Path) error {
 
 			levelCalculationAsInt := getPathSeparatorCount(thisPath) - rootPathSeparatorCount
 
-			// Ensure we have not wrapped around for uint conversion
+			// Ensure we have not wrapped around for uint conversion, prevent CWE-190
 			if levelCalculationAsInt < 0 {
 				return nil
 			}
