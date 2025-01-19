@@ -30,14 +30,19 @@ func (ctx *Context) Zap(outputPath string, safeMode bool) error {
 		return err
 	}
 
+	// This is needed for the progress bar
+	println()
+
 	err = ctx.removeDuplicates(safeMode)
 
 	if err != nil {
 		return err
 	}
 
-	//return ctx.removeEmptyZappedFolders(safeMode)
-	return err
+	// This is needed for the progress bar
+	println()
+
+	return ctx.removeEmptyZappedFolders(safeMode)
 }
 
 func (ctx *Context) copyDeduplicatedFiles(outputPath string, safeMode bool) error {
@@ -70,17 +75,13 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 		return err
 	}
 
-	err = createZapDirectoryStructure(outputPathAbs)
-
-	if err != nil {
-		return err
-	}
-
 	remainingPercentage := (float64(info.TotalFileSize-info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
 	removalPercentage := (float64(info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
 	utils.ConsoleAndLogPrintf("Copying %s (%s) to \"%s\". This is %.2f%% of %s, a reduction of %s (%.2f%%)", utils.Pluralize("de-duplicated file", info.FileHashesToZap), humanize.Bytes(info.TotalFileSize-info.UniqueHashTotalFileSize), outputPathAbs, remainingPercentage, humanize.Bytes(info.TotalFileSize), humanize.Bytes(info.TotalFileSize-(info.TotalFileSize-info.UniqueHashTotalFileSize)), removalPercentage)
 
 	bar := progressbar.Default(info.FileHashesToZap)
+
+	zapStructureCreated := false
 
 	// Do batches until there are no more
 	for {
@@ -92,8 +93,18 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 		}
 
 		// Have we finished?
-		if fileHashesToZap == nil {
+		if len(fileHashesToZap) == 0 {
 			return nil
+		}
+
+		// We do this here as there is no point in creating a structure if there is nothing to hash (i.e. calling this earlier)
+		if !zapStructureCreated {
+			err = createZapDirectoryStructure(outputPathAbs)
+
+			if err != nil {
+				return err
+			}
+			zapStructureCreated = true
 		}
 
 		var zappedFileHashIds []uint
@@ -166,10 +177,8 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 	move := !safeMode
 
 	// ZAP
-
-	// TODO: for collision detection, no do not compare the files. If file with same hash then consider it the same, no need to re-hash, just ignore, move on
 	destinationPath := path.Join(zapBasePath, hexFileName[:2], hexFileName[2:4], hexFileName[4:])
-	err := CopyOrMoveFile(file.AbsolutePath, destinationPath, move)
+	err := CopyOrMoveFile(file.AbsolutePath, destinationPath, move, true)
 
 	if err != nil {
 		log.Fatalf("Could not ZAP file \"%s\": %v", file.AbsolutePath, err)
@@ -216,7 +225,7 @@ AND			fh.ignored = 0
 		}
 
 		// Have we finished?
-		if duplicateFilesToRemove == nil {
+		if len(duplicateFilesToRemove) == 0 {
 			return nil
 		}
 
