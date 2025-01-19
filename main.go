@@ -16,7 +16,7 @@ import (
 //goland:noinspection GoUnnecessarilyExportedIdentifiers
 var AppVersion = "6.0"
 
-var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  crawl\n  hash\n  zap\n  unzap\n  copy_zaps\n  clear_empty_folders\n"
+var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  crawl\n  hash\n  zap\n  unzap\n  merge_zaps\n  clear_empty_folders\n"
 
 //go:embed config.yaml
 var defaultConfigData []byte
@@ -84,11 +84,11 @@ func (ctx *Context) runCommand(command string) error {
 
 		return ctx.UnZap(os.Args[2], os.Args[3])
 
-	case "copy_zaps":
+	case "merge_zaps":
 		if len(os.Args) != 4 {
-			log.Fatal("copy_zaps requires source and destination paths.")
+			log.Fatal("merge_zaps requires source and destination paths.")
 		}
-		return CopyZaps(os.Args[2], os.Args[3])
+		return MergeZaps(os.Args[2], os.Args[3])
 
 	case "clear_empty_folders":
 		if len(os.Args) != 3 {

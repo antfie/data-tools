@@ -9,7 +9,7 @@ import (
 	"path"
 )
 
-func CopyZaps(sourcePath, destinationPath string) error {
+func MergeZaps(sourcePath, destinationPath string) error {
 	sourcePathInfo, err := os.Stat(sourcePath)
 
 	if err != nil {
@@ -59,7 +59,7 @@ func buildPathMap(sourcePath, destinationPath string) map[string]string {
 }
 
 func copyZapsInFolder(orchestrator *utils.TaskOrchestrator, sourcePath, destinationPath string) {
-	err := CopyOrMoveFiles(sourcePath, destinationPath, true)
+	err := CopyOrMoveFiles(sourcePath, destinationPath, true, true)
 
 	if err != nil {
 		//return err
