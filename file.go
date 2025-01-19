@@ -29,7 +29,7 @@ func IsFile(path string) bool {
 // application/vnd.sqlite3
 
 func GetFileType(filePath string) (string, error) {
-	command := exec.Command("file", "-b", "--mime-type", filePath)
+	command := exec.Command("/usr/bin/file", "-b", "--mime-type", filePath)
 	output, err := command.Output()
 
 	if err != nil {
