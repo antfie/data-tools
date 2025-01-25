@@ -299,11 +299,24 @@ func (ctx *Context) removeDuplicateFile(orchestrator *utils.TaskOrchestrator, sa
 func (ctx *Context) removeEmptyZappedFolders(safeMode bool) error {
 	utils.ConsoleAndLogPrintf("Removing empty folders")
 
+	var filesToProcess []string
 	var foldersToProcess []string
-	result := ctx.DB.Raw(QueryGetZappedFolders()).Scan(&foldersToProcess)
+	result := ctx.DB.Raw(QueryGetZappedFolders()).Scan(&filesToProcess)
 
 	if result.Error != nil {
 		return result.Error
+	}
+
+	for _, file := range filesToProcess {
+		pathName := path.Dir(file)
+
+		if utils.IsInArray(path.Base(pathName), ctx.Config.FolderNamesToIgnore) {
+			continue
+		}
+
+		if !utils.IsInArray(pathName, foldersToProcess) {
+			foldersToProcess = append(foldersToProcess, pathName)
+		}
 	}
 
 	if safeMode {
