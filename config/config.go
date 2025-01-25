@@ -9,8 +9,8 @@ import (
 
 type yamlConfig struct {
 	IsDebug                     bool     `yaml:"debug"`
-	DBPath                      string   `yaml:"db_path"`
 	LogFilePath                 string   `yaml:"log_file_path"`
+	DBPath                      string   `yaml:"db_path"`
 	ZapDataPath                 string   `yaml:"zap_data_path"`
 	BatchSize                   int64    `yaml:"batch_size"`
 	MaxConcurrentFileOperations int64    `yaml:"max_concurrent_file_operations"`
@@ -19,8 +19,8 @@ type yamlConfig struct {
 }
 type Config struct {
 	IsDebug                     bool
-	DBPath                      string
 	LogFilePath                 string
+	DBPath                      string
 	ZapDataPath                 string
 	BatchSize                   int64
 	MaxConcurrentFileOperations int64
@@ -61,8 +61,8 @@ func parseConfigFile(configFilePath string) (*Config, error) {
 
 	return &Config{
 		IsDebug:                     config.IsDebug,
-		DBPath:                      config.DBPath,
 		LogFilePath:                 config.LogFilePath,
+		DBPath:                      config.DBPath,
 		ZapDataPath:                 config.ZapDataPath,
 		BatchSize:                   config.BatchSize,
 		MaxConcurrentFileOperations: config.MaxConcurrentFileOperations,

@@ -95,7 +95,7 @@ AND			f.deleted_at IS NULL
 AND			f.ignored = 0
 AND			fh.zapped = 1
 AND			fh.ignored = 0
-ORDER BY	f.size DESC -- for deterministic result order
+ORDER BY	f.size DESC -- to remove the largest duplicates first, and for deterministic result order 
 LIMIT 		?
 `, fileAbsolutePathCTEQuery)
 }

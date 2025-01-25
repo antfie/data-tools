@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -11,6 +12,11 @@ func ClearEmptyFolders(path []string) error {
 		pathInfo, err := os.Stat(p)
 
 		if err != nil {
+			// Ignore if the file/path was not found
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+
 			return err
 		}
 

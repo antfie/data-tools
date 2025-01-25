@@ -24,6 +24,7 @@ echo -e "\n${CYAN}Building v${VERSION}...${NC}"
 CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags="$BUILD_FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-mac-arm64-${VERSION}" .
 CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -ldflags="$BUILD_FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-mac-amd64-${VERSION}" .
 
+# Use the alternative driver for these
 GOOS=linux GOARCH=arm64 go build -ldflags="$BUILD_FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-linux-arm64-${VERSION}" -tags alternative_driver .
 GOOS=linux GOARCH=amd64 go build -ldflags="$BUILD_FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-linux-amd64-${VERSION}" -tags alternative_driver .
 GOOS=windows GOARCH=amd64 go build -ldflags="$BUILD_FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-${VERSION}.exe" -tags alternative_driver .

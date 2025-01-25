@@ -202,6 +202,17 @@ func hashFile(orchestrator *utils.TaskOrchestrator, existingHashSignatures *[]Ha
 		return
 	}
 
+	if fileInfo.IsDir() {
+		log.Printf("Ignoring \"%s\" because it is a directory, not a file", file.AbsolutePath)
+
+		orchestrator.Lock()
+		*notFoundFileIDs = append(*notFoundFileIDs, file.FileID)
+		orchestrator.Unlock()
+
+		orchestrator.FinishTask()
+		return
+	}
+
 	// Do file typing first to fail faster if there is a file issue
 	fileType, err := GetFileType(file.AbsolutePath)
 

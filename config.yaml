@@ -1,6 +1,6 @@
 debug: false
-db_path: data.db
 log_file_path: data-tools.log
+db_path: data.db
 zap_data_path: "ZAP"
 batch_size: 1000
 max_concurrent_file_operations: 10
@@ -16,4 +16,5 @@ folder_names_to_ignore:
   - .TemporaryItems         # macOS
   - .DocumentRevisions-V100 # macOS
   - .Spotlight-V100         # macOS
+  - .fseventsd              # macOS
 #  - .stversions             # Syncthing

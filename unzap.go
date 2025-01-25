@@ -69,7 +69,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 		}
 
 		// Have we finished?
-		if fileHashesToUnZap == nil {
+		if len(fileHashesToUnZap) == 0 {
 			return nil
 		}
 
@@ -138,8 +138,8 @@ func (ctx *Context) unZapFile(orchestrator *utils.TaskOrchestrator, processedFil
 
 	destinationFilePath := path.Join(destinationAbsolutePath, file.AbsolutePath)
 
-	// un-ZAP
-	err := CopyOrMoveFile(sourceFilePath, destinationFilePath, false)
+	// un-ZAP to a non-zap location, e.g. expand to some location on disk
+	err := CopyOrMoveFile(sourceFilePath, destinationFilePath, false, false)
 
 	if err != nil {
 		log.Panic(err)
