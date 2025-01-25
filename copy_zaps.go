@@ -30,6 +30,18 @@ func MergeZaps(sourcePath, destinationPath string) error {
 		return fmt.Errorf("\"%s\" is not a directory", destinationPathInfo)
 	}
 
+	print(fmt.Printf("This will move zaps from :\"%s\" to \"%s\". If you wish to proceed type YES: ", sourcePath, destinationPath))
+	var input string
+	_, err = fmt.Scanln(&input)
+
+	if err != nil {
+		return err
+	}
+
+	if input != "YES" {
+		return nil
+	}
+
 	paths := buildPathMap(sourcePath, destinationPath)
 	bar := progressbar.Default(int64(len(paths)))
 	orchestrator := utils.NewTaskOrchestrator(bar, len(paths), 10)
