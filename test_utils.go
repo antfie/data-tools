@@ -28,7 +28,7 @@ func createTempTestDataPath(t *testing.T) string {
 	assert.NoError(t, err)
 
 	// Populate test data
-	err = CopyOrMoveFiles(testingDataSourcePath, testingDataDestinationPath, false)
+	err = CopyOrMoveFiles(testingDataSourcePath, testingDataDestinationPath, false, false)
 	assert.NoError(t, err)
 
 	return testingDataDestinationPath
