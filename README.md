@@ -27,6 +27,8 @@ When you ZAP your files, every unique file is placed in a folder and all duplica
 
 Note that empty folders will not be created when un-ZAP-ping, should you desire to re-inflate your disk drive.
 
+It is really, really important that you run crawl AND hash on the same OS. This is due to different filesystems and implementations of the 'file' command which can lead to issues.
+
 ## How Can I Support This?
 
 We welcome fixes, features and donations.
