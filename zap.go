@@ -77,7 +77,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 	remainingPercentage := (float64(info.TotalFileSize-info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
 	removalPercentage := (float64(info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
-	utils.ConsoleAndLogPrintf("Copying %s (%s) to \"%s\". This is %.2f%% of %s, a reduction of %s (%.2f%%)", utils.Pluralize("de-duplicated file", info.FileHashesToZap), humanize.Bytes(info.TotalFileSize-info.UniqueHashTotalFileSize), outputPathAbs, remainingPercentage, humanize.Bytes(info.TotalFileSize), humanize.Bytes(info.TotalFileSize-(info.TotalFileSize-info.UniqueHashTotalFileSize)), removalPercentage)
+	utils.ConsoleAndLogPrintf("Moving %s (%s) to \"%s\". This is %.2f%% of %s, a reduction of %s (%.2f%%)", utils.Pluralize("de-duplicated file", info.FileHashesToZap), humanize.Bytes(info.TotalFileSize-info.UniqueHashTotalFileSize), outputPathAbs, remainingPercentage, humanize.Bytes(info.TotalFileSize), humanize.Bytes(info.TotalFileSize-(info.TotalFileSize-info.UniqueHashTotalFileSize)), removalPercentage)
 
 	bar := progressbar.Default(info.FileHashesToZap)
 
