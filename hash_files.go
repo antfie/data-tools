@@ -263,13 +263,14 @@ func hashFile(orchestrator *utils.TaskOrchestrator, existingHashSignatures *[]Ha
 				return
 			}
 
-			if existingHashSignature.FileType != signature.FileType {
-				log.Printf("File \"%s\" has unexpected type. Expected \"%s\", got \"%s\". Has a hash collision occured?", file.AbsolutePath, existingHashSignature.FileType, signature.FileType)
-				orchestrator.Unlock()
-
-				orchestrator.FinishTask()
-				return
-			}
+			// Skip this due to different implementation os the 'file' command
+			//if existingHashSignature.FileType != signature.FileType {
+			//	log.Printf("File \"%s\" has unexpected type. Expected \"%s\", got \"%s\". Has a hash collision occured?", file.AbsolutePath, existingHashSignature.FileType, signature.FileType)
+			//	orchestrator.Unlock()
+			//
+			//	orchestrator.FinishTask()
+			//	return
+			//}
 
 			(*existingHashSignatures)[existingHashSignatureIndex].fileIDs = append(existingHashSignature.fileIDs, file.FileID)
 			orchestrator.Unlock()
