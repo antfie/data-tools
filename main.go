@@ -22,6 +22,8 @@ var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  crawl\n  h
 var defaultConfigData []byte
 
 func main() {
+	sanityCheckOSRequirements()
+
 	c, err := config.Load(defaultConfigData)
 
 	if err != nil {
@@ -60,6 +62,23 @@ func main() {
 	}
 
 	utils.ConsoleAndLogPrintf("Finished in %s", utils.FormatDuration(time.Since(startTime)))
+}
+
+func sanityCheckOSRequirements() {
+	requiredPrograms := []string{
+		"/bin/mv",
+		"/bin/cp",
+		"/usr/bin/file",
+	}
+
+	for _, requiredProgram := range requiredPrograms {
+		_, err := os.Stat(requiredProgram)
+
+		if errors.Is(err, os.ErrNotExist) {
+			log.Fatalf("Error: Could not find required \"%s\" executable", requiredProgram)
+		}
+	}
+
 }
 
 func (ctx *Context) runCommand(command string) error {
