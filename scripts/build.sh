@@ -20,7 +20,6 @@ BUILD_FLAGS="-X main.AppVersion=$VERSION -s -w"
 echo -e "\n${CYAN}Building v${VERSION}...${NC}"
 
 # The regular SQLite driver (which is faster) requires CGO
-
 CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build -ldflags="$BUILD_FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-mac-arm64-${VERSION}" .
 CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build -ldflags="$BUILD_FLAGS" -buildvcs=false -trimpath -o "dist/data-tools-mac-amd64-${VERSION}" .
 
