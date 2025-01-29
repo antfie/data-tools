@@ -254,7 +254,9 @@ func hashFile(orchestrator *utils.TaskOrchestrator, existingHashSignatures *[]Ha
 
 	for existingHashSignatureIndex, existingHashSignature := range *existingHashSignatures {
 		if existingHashSignature.Hash == signature.Hash {
-			// Do hash collision detection on the found hash
+			// Do hash collision detection on the found hash. We only need to compare size, not type.
+			// We do not compare by type because different versions of file command have different outputs.
+			// If we run crawl on one machine and hash on another it can lead to problems.
 			if existingHashSignature.Size != signature.Size {
 				log.Printf("File \"%s\" has unexpected size. Expected %d, got %d. Has a hash collision occured?", file.AbsolutePath, existingHashSignature.Size, signature.Size)
 				orchestrator.Unlock()
@@ -262,15 +264,6 @@ func hashFile(orchestrator *utils.TaskOrchestrator, existingHashSignatures *[]Ha
 				orchestrator.FinishTask()
 				return
 			}
-
-			// Skip this due to different implementation os the 'file' command
-			//if existingHashSignature.FileType != signature.FileType {
-			//	log.Printf("File \"%s\" has unexpected type. Expected \"%s\", got \"%s\". Has a hash collision occured?", file.AbsolutePath, existingHashSignature.FileType, signature.FileType)
-			//	orchestrator.Unlock()
-			//
-			//	orchestrator.FinishTask()
-			//	return
-			//}
 
 			(*existingHashSignatures)[existingHashSignatureIndex].fileIDs = append(existingHashSignature.fileIDs, file.FileID)
 			orchestrator.Unlock()
