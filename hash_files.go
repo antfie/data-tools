@@ -4,7 +4,6 @@ import (
 	"data-tools/crypto"
 	"data-tools/models"
 	"data-tools/utils"
-	"errors"
 	"github.com/dustin/go-humanize"
 	"github.com/schollz/progressbar/v3"
 	"gorm.io/gorm"
@@ -107,10 +106,10 @@ func (ctx *Context) HashFiles() error {
 				if hashSignatures[hashSignatureIndex].FileTypeID == nil {
 					fileTypeModel := models.FileType{Type: hashSignature.FileType}
 
-					result = tx.Create(&fileTypeModel)
+					createFileTypeResult := tx.Create(&fileTypeModel)
 
-					if result.Error != nil {
-						return result.Error
+					if createFileTypeResult.Error != nil {
+						return createFileTypeResult.Error
 					}
 
 					hashSignatures[hashSignatureIndex].FileTypeID = &fileTypeModel.ID
@@ -125,7 +124,12 @@ func (ctx *Context) HashFiles() error {
 						Size:       &hashSignature.Size,
 					}
 
-					result = tx.Create(&model)
+					createFileHashResult := tx.Create(&model)
+
+					if createFileHashResult.Error != nil {
+						return createFileHashResult.Error
+					}
+
 					totalNewUniqueHashes++
 
 					if len(hashSignature.fileIDs) > 1 {
@@ -139,10 +143,6 @@ func (ctx *Context) HashFiles() error {
 						}
 					}
 
-					if result.Error != nil {
-						return result.Error
-					}
-
 					hashSignatures[hashSignatureIndex].HashID = &model.ID
 				} else {
 					duplicateFileHashes += len(hashSignature.fileIDs)
@@ -152,23 +152,23 @@ func (ctx *Context) HashFiles() error {
 				totalFileSize += hashSignature.Size * uint(len(hashSignature.fileIDs))
 
 				for _, fileID := range hashSignature.fileIDs {
-					result = tx.Model(&models.File{}).Where("id = ?", fileID).Updates(models.File{
+					fileUpdateResult := tx.Where("id = ?", fileID).Updates(models.File{
 						FileHashID: hashSignatures[hashSignatureIndex].HashID,
 						Size:       &hashSignature.Size,
 						FileTypeID: hashSignatures[hashSignatureIndex].FileTypeID,
 					})
 
-					if result.Error != nil {
-						return result.Error
+					if fileUpdateResult.Error != nil {
+						return fileUpdateResult.Error
 					}
 				}
 			}
 
 			if len(notFoundFileIDs) > 0 {
-				result = tx.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+				deleteNotFoundResult := tx.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
 
-				if result.Error != nil {
-					return result.Error
+				if deleteNotFoundResult.Error != nil {
+					return deleteNotFoundResult.Error
 				}
 			}
 
@@ -186,7 +186,7 @@ func hashFile(orchestrator *utils.TaskOrchestrator, existingHashSignatures *[]Ha
 
 	// If the file does not exist we can ignore it
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if os.IsNotExist(err) {
 			log.Printf("Ignoring not-found file \"%s\"", file.AbsolutePath)
 
 			orchestrator.Lock()
