@@ -94,7 +94,7 @@ func (ctx *Context) runCommand(command string) error {
 		return ctx.HashFiles()
 
 	case "zap":
-		return ctx.Zap(ctx.Config.ZapDataPath, false)
+		return ctx.Zap(false)
 
 	case "unzap":
 		if len(os.Args) != 4 {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"data-tools/models"
 	"data-tools/utils"
 	"encoding/hex"
 	"github.com/btcsuite/btcd/btcutil/base58"
@@ -89,13 +88,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 		orchestrator.WaitForTasks()
 
-		if len(notFoundFileIDs) > 0 {
-			result = ctx.DB.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
-
-			if result.Error != nil {
-				return result.Error
-			}
-		}
+		return DealWithNotFoundFiles(ctx.DB, notFoundFileIDs)
 	}
 }
 

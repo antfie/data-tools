@@ -4,6 +4,7 @@ import (
 	"data-tools/models"
 	"data-tools/utils"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/dustin/go-humanize"
@@ -22,8 +23,8 @@ type ZapResult struct {
 	AbsolutePath string
 }
 
-func (ctx *Context) Zap(outputPath string, safeMode bool) error {
-	err := ctx.copyDeduplicatedFiles(outputPath, safeMode)
+func (ctx *Context) Zap(safeMode bool) error {
+	err := ctx.copyDeduplicatedFiles(ctx.Config.ZapDataPath, safeMode)
 
 	if err != nil {
 		return err
@@ -128,33 +129,59 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 				if result.Error != nil {
 					return result.Error
 				}
-			}
 
-			if len(zappedFileIds) > 0 {
-				result = tx.Where("id IN ?", zappedFileIds).Updates(models.File{
-					Zapped: true,
-				})
-
-				if result.Error != nil {
-					return result.Error
+				if result.RowsAffected != int64(len(zappedFileHashIds)) {
+					return errors.New("could not zap file hashes in db")
 				}
 			}
 
-			if len(notFoundFileIDs) > 0 {
-				result = tx.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+			zapFileError := zapFilesInDB(tx, zappedFileIds)
 
-				if result.Error != nil {
-					return result.Error
-				}
+			if zapFileError != nil {
+				return zapFileError
 			}
 
-			return nil
+			return DealWithNotFoundFiles(tx, notFoundFileIDs)
 		})
 
 		if err != nil {
 			log.Fatalf("DB Error: %v", err)
 		}
 	}
+}
+
+func zapFilesInDB(tx *gorm.DB, zappedFileIds []uint) error {
+	if len(zappedFileIds) > 0 {
+		fileUpdateResult := tx.Where("id IN ?", zappedFileIds).Updates(models.File{
+			Zapped: true,
+		})
+
+		if fileUpdateResult.Error != nil {
+			return fileUpdateResult.Error
+		}
+
+		if fileUpdateResult.RowsAffected != int64(len(zappedFileIds)) {
+			return errors.New("could not zap files in db")
+		}
+	}
+
+	return nil
+}
+
+func DealWithNotFoundFiles(tx *gorm.DB, notFoundFileIDs []uint) error {
+	if len(notFoundFileIDs) > 0 {
+		notFoundFileResult := tx.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
+
+		if notFoundFileResult.Error != nil {
+			return notFoundFileResult.Error
+		}
+
+		if notFoundFileResult.RowsAffected != int64(len(notFoundFileIDs)) {
+			return errors.New("could not delete files from db")
+		}
+	}
+
+	return nil
 }
 
 func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool, zapBasePath string, file ZapResult, zappedFileHashIds, zappedFileIds, notFoundFileIDs *[]uint) {
@@ -243,25 +270,13 @@ AND			fh.ignored = 0
 		orchestrator.WaitForTasks()
 
 		err := ctx.DB.Transaction(func(tx *gorm.DB) error {
-			if len(zappedFileIds) > 0 {
-				result = tx.Where("id IN ?", zappedFileIds).Updates(models.File{
-					Zapped: true,
-				})
+			zapFileError := zapFilesInDB(tx, zappedFileIds)
 
-				if result.Error != nil {
-					return result.Error
-				}
+			if zapFileError != nil {
+				return zapFileError
 			}
 
-			if len(notFoundFileIDs) > 0 {
-				result = tx.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
-
-				if result.Error != nil {
-					return result.Error
-				}
-			}
-
-			return nil
+			return DealWithNotFoundFiles(tx, notFoundFileIDs)
 		})
 
 		if err != nil {
