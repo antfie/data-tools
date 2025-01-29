@@ -1,61 +1,105 @@
 package main
 
 import (
+	"errors"
 	"io"
+	"log"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
 )
 
-func CopyOrMoveFiles(source, destination string, move bool) error {
+func CopyOrMoveFiles(source, destination string, move, isDestinationZap bool) error {
 	files, err := GetAllFiles(source)
 
 	if err != nil {
 		return err
 	}
 
+	copyText := "copying"
+
+	if move {
+		copyText = "moving"
+	}
+
 	for _, sourceFilePath := range files {
 		relativePath := strings.TrimPrefix(sourceFilePath, source)
-		err := CopyOrMoveFile(sourceFilePath, path.Join(destination, relativePath), move)
+		destinationFilePath := path.Join(destination, relativePath)
+
+		// If there is an error, log it and move onto the next file
+		_, err = CopyOrMoveFile(sourceFilePath, destinationFilePath, move, isDestinationZap)
 
 		if err != nil {
-			return err
+			log.Printf("Error %s file \"%s\" to \"%s\": %s\n", copyText, sourceFilePath, destinationFilePath, err)
 		}
 	}
 
 	return nil
 }
 
-func CopyOrMoveFile(source, destination string, move bool) error {
-	destinationIsTheSame, err := isDestinationTheSame(source, destination)
+func CopyOrMoveFile(source, destination string, move, isDestinationZap bool) (bool, error) {
+	comparisonMode := Hash
 
-	if err != nil {
-		return err
+	// When working with ZAP files for performance we only compare by size as the file name is the hash
+	if isDestinationZap {
+		comparisonMode = Size
 	}
 
-	if destinationIsTheSame {
+	comparisonResult, comparisonError := isDestinationTheSame(source, destination, comparisonMode)
+
+	if comparisonError != nil {
+		return false, comparisonError
+	}
+
+	if comparisonResult == Different {
+		copyText := "copying"
+
 		if move {
-			// Remove existing file
-			return os.Remove(source)
+			copyText = "moving"
 		}
 
-		// Nothing to do?
-		return nil
+		log.Printf("Not %s file \"%s\" to \"%s\" because they are different\n", copyText, source, destination)
+		return false, nil
 	}
 
-	if move {
-		return os.Rename(source, destination)
+	if comparisonResult == Same {
+		if move {
+			// Remove existing file
+			removeErr := os.Remove(source)
+			return removeErr == nil, removeErr
+		}
+
+		// Nothing to do
+		return true, nil
 	}
 
+	if comparisonResult == DestinationDoesNotExist {
+		// If not working with Zap
+		if !isDestinationZap {
+			// Create the directory structure if required
+			osMkdirAllErr := osMkdirAll(filepath.Dir(destination))
+
+			if osMkdirAllErr != nil {
+				return false, osMkdirAllErr
+			}
+		}
+
+		if move {
+			osMoveErr := osMove(source, destination)
+			return osMoveErr == nil, osMoveErr
+		}
+
+		osCopyErr := osCopy(source, destination)
+		return osCopyErr == nil, osCopyErr
+	}
+
+	return false, errors.New("comparisonResult test not implemented")
+}
+
+func doCopy(source, destination string) error {
 	sourceFile, err := os.Open(path.Clean(source))
-
-	if err != nil {
-		return err
-	}
-
-	// Create the directory structure if required
-	err = os.MkdirAll(filepath.Dir(destination), 0750)
 
 	if err != nil {
 		return err
@@ -91,34 +135,102 @@ func CopyOrMoveFile(source, destination string, move bool) error {
 		return err
 	}
 
+	sourceFileInfo, err := os.Stat(source)
+
+	if err != nil {
+		return err
+	}
+
+	err = os.Chmod(destination, sourceFileInfo.Mode())
+
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func isDestinationTheSame(source, destination string) (bool, error) {
-	_, err := os.Stat(destination)
+// we use the OS rather than golang API to get around limitations e.g. file operations across different filesystems
+func osMove(source, destination string) error {
+	command := exec.Command("/bin/mv", source, destination)
+	return debuggableExecution(command)
+}
+
+// we use the OS rather than golang API to get around imitations e.g. file operations across different filesystems
+func osCopy(source, destination string) error {
+	command := exec.Command("/bin/cp", source, destination)
+	return debuggableExecution(command)
+}
+
+func debuggableExecution(cmd *exec.Cmd) error {
+	err := cmd.Run()
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type ComparisonMode int
+
+const (
+	Size ComparisonMode = iota
+	Hash
+)
+
+type ShouldOverWrite int
+
+const (
+	Indeterminate ShouldOverWrite = iota
+	DestinationDoesNotExist
+	Same
+	Different
+)
+
+func isDestinationTheSame(source, destination string, mode ComparisonMode) (ShouldOverWrite, error) {
+	destInf, destinationStatErr := os.Stat(destination)
 
 	// Does a file already exist at the destination?
-	if err == nil {
+	if os.IsNotExist(destinationStatErr) {
+		return DestinationDoesNotExist, nil
+	}
+
+	if destinationStatErr != nil {
+		return Indeterminate, destinationStatErr
+	}
+
+	srcInf, sourceStatErr := os.Stat(source)
+
+	// If we can't find the source file, that would be a problem
+	if sourceStatErr != nil {
+		return Indeterminate, sourceStatErr
+	}
+
+	if mode == Size {
+		filesAreTheSame := destInf.Size() == srcInf.Size()
+
+		if filesAreTheSame {
+			return Same, nil
+		}
+
+		return Different, nil
+	}
+
+	if mode == Hash {
 		filesAreTheSame, err := CompareFiles(source, destination)
 
 		if err != nil {
-			return false, err
+			return Indeterminate, err
 		}
 
 		// Nothing to do here
 		if filesAreTheSame {
-			return filesAreTheSame, err
+			return Same, nil
 		}
 
-		// The files are different. This is a problem
-		return true, ErrNotOverwritingExistingDifferentFile
+		return Different, nil
 	}
 
-	// Was the error anything other than an expected file not found?
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-
-	// Was the error anything other than an expected file not found?
-	return false, err
+	return Indeterminate, errors.New("ComparisonMode not implemented")
 }
