@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -96,58 +95,6 @@ func CopyOrMoveFile(source, destination string, move, isDestinationZap bool) (bo
 	}
 
 	return false, errors.New("comparisonResult test not implemented")
-}
-
-func doCopy(source, destination string) error {
-	sourceFile, err := os.Open(path.Clean(source))
-
-	if err != nil {
-		return err
-	}
-
-	destinationFile, err := os.Create(path.Clean(destination))
-
-	if err != nil {
-		return err
-	}
-
-	_, err = io.Copy(destinationFile, sourceFile)
-
-	if err != nil {
-		return err
-	}
-
-	err = destinationFile.Sync()
-
-	if err != nil {
-		return err
-	}
-
-	err = destinationFile.Close()
-
-	if err != nil {
-		return err
-	}
-
-	err = sourceFile.Close()
-
-	if err != nil {
-		return err
-	}
-
-	sourceFileInfo, err := os.Stat(source)
-
-	if err != nil {
-		return err
-	}
-
-	err = os.Chmod(destination, sourceFileInfo.Mode())
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // we use the OS rather than golang API to get around limitations e.g. file operations across different filesystems
