@@ -13,7 +13,7 @@ func ClearEmptyFolders(path []string) error {
 
 		if err != nil {
 			// Ignore if the file/path was not found
-			if errors.Is(err, os.ErrNotExist) {
+			if os.IsNotExist(err) {
 				return nil
 			}
 
