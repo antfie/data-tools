@@ -16,7 +16,7 @@ import (
 //goland:noinspection GoUnnecessarilyExportedIdentifiers
 var AppVersion = "6.0"
 
-var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  crawl\n  hash\n  zap\n  unzap\n  merge_zaps\n  clear_empty_folders\n"
+var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  crawl\n  hash\n  zap\n  unzap\n  merge_zaps\n  clear_empty_folders\n  integrity\n"
 
 //go:embed config.yaml
 var defaultConfigData []byte
@@ -115,6 +115,9 @@ func (ctx *Context) runCommand(command string) error {
 		}
 
 		return ClearEmptyFolders([]string{os.Args[2]})
+
+	case "integrity":
+		return ctx.ZapDBIntegrityTestBySize()
 	}
 
 	return errors.New(fmt.Sprintf("Command \"%s\" not recognised. %s", command, usageText))
