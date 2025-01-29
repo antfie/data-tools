@@ -18,7 +18,7 @@ func (ctx *Context) UnZap(sourcePath, outputPath string) error {
 	_, err := os.Stat(outputPath)
 
 	// We expect the output directory to be empty
-	if err == nil || !errors.Is(err, os.ErrNotExist) {
+	if err == nil || !os.IsNotExist(err) {
 		return ErrDestinationPathNotEmpty
 	}
 
@@ -139,7 +139,7 @@ func (ctx *Context) unZapFile(orchestrator *utils.TaskOrchestrator, processedFil
 	destinationFilePath := path.Join(destinationAbsolutePath, file.AbsolutePath)
 
 	// un-ZAP to a non-zap location, e.g. expand to some location on disk
-	err := CopyOrMoveFile(sourceFilePath, destinationFilePath, false, false)
+	_, err := CopyOrMoveFile(sourceFilePath, destinationFilePath, false, false)
 
 	if err != nil {
 		log.Panic(err)
