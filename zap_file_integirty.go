@@ -93,26 +93,3 @@ func AssertHashesInZapPath(zapPath string, hashes map[string]int64) ([]string, e
 
 	return notFoundHashes, nil
 }
-
-func ZapFolderIntegrityCheck(zapPath string, hashes map[string]int64) ([]string, error) {
-	var notFoundHashes []string
-
-	for zappedFile, err := range GetAllZappedFilesImproved(zapPath) {
-		if err != nil {
-			return nil, err
-		}
-
-		size, found := hashes[zappedFile.Hash]
-
-		if !found {
-			notFoundHashes = append(notFoundHashes, zappedFile.Hash)
-		}
-
-		if size != zappedFile.Size {
-			// TODO: do we want to log this, or return an array of not valid items?
-			notFoundHashes = append(notFoundHashes, zappedFile.Hash)
-		}
-	}
-
-	return notFoundHashes, nil
-}
