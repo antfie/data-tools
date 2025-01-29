@@ -4,7 +4,6 @@ import (
 	"data-tools/models"
 	"data-tools/utils"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/dustin/go-humanize"
@@ -178,16 +177,18 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 
 	// ZAP
 	destinationPath := path.Join(zapBasePath, hexFileName[:2], hexFileName[2:4], hexFileName[4:])
-	err := CopyOrMoveFile(file.AbsolutePath, destinationPath, move, true)
+	success, err := CopyOrMoveFile(file.AbsolutePath, destinationPath, move, true)
 
 	if err != nil {
 		log.Fatalf("Could not ZAP file \"%s\": %v", file.AbsolutePath, err)
 	}
 
-	orchestrator.Lock()
-	*zappedFileHashIds = append(*zappedFileHashIds, file.FileHashID)
-	*zappedFileIds = append(*zappedFileIds, file.FileID)
-	orchestrator.Unlock()
+	if success {
+		orchestrator.Lock()
+		*zappedFileHashIds = append(*zappedFileHashIds, file.FileHashID)
+		*zappedFileIds = append(*zappedFileIds, file.FileID)
+		orchestrator.Unlock()
+	}
 
 	orchestrator.FinishTask()
 }
@@ -284,7 +285,7 @@ func (ctx *Context) removeDuplicateFile(orchestrator *utils.TaskOrchestrator, sa
 	if !safeMode {
 		err := os.Remove(file.AbsolutePath)
 
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err != nil && !os.IsNotExist(err) {
 			log.Fatalf("Could not remove file \"%s\": %v", file.AbsolutePath, err)
 		}
 	}
@@ -331,7 +332,7 @@ func createZapDirectoryStructure(absoluteBasePath string) error {
 	info, err := os.Stat(absoluteBasePath)
 
 	// If a folder already exists at this location we assume the Zap structure has already been created
-	if info != nil || !errors.Is(err, os.ErrNotExist) {
+	if info != nil || !os.IsNotExist(err) {
 		return err
 	}
 
