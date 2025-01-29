@@ -74,7 +74,7 @@ func sanityCheckOSRequirements() {
 	for _, requiredProgram := range requiredPrograms {
 		_, err := os.Stat(requiredProgram)
 
-		if errors.Is(err, os.ErrNotExist) {
+		if os.IsNotExist(err) {
 			log.Fatalf("Error: Could not find required \"%s\" executable", requiredProgram)
 		}
 	}
