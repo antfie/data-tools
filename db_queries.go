@@ -163,8 +163,8 @@ ORDER BY	id -- for deterministic result order
 `
 }
 
-func (ctx *Context) GetBatchesOfIDs(query string) (int, [][]int, error) {
-	total := 0
+func (ctx *Context) GetBatchesOfIDs(query, idPrefix string) (int64, [][]int, error) {
+	total := int64(0)
 	var output [][]int
 	var batches []string
 
@@ -172,7 +172,13 @@ func (ctx *Context) GetBatchesOfIDs(query string) (int, [][]int, error) {
 		return 0, nil, errors.New("missing BATCH_NUMBER placeholder in query")
 	}
 
-	formattedBatchSize := fmt.Sprintf("(ROW_NUMBER() OVER (ORDER BY id) - 1) / %d AS batch_number", ctx.Config.BatchSize)
+	formattedIdPrefix := ""
+
+	if len(idPrefix) > 0 {
+		formattedIdPrefix = fmt.Sprintf("%s.", idPrefix)
+	}
+
+	formattedBatchSize := fmt.Sprintf("(ROW_NUMBER() OVER (ORDER BY %sid) - 1) / %d AS batch_number", formattedIdPrefix, ctx.Config.BatchSize)
 	formattedQuery := strings.Replace(query, "BATCH_NUMBER", formattedBatchSize, 1)
 
 	result := ctx.DB.Raw(fmt.Sprintf(`
@@ -180,7 +186,7 @@ WITH NumberedRows AS (
 	%s
 )
 SELECT
-    GROUP_CONCAT(id) AS ids
+    GROUP_CONCAT(NumberedRows.id) AS ids
 FROM NumberedRows
 GROUP BY batch_number
 ORDER BY batch_number
