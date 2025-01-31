@@ -27,9 +27,6 @@ func (ctx *Context) Zap(safeMode bool) error {
 	if err != nil {
 		return err
 	}
-	
-	// This is needed for the progress bar
-	println()
 
 	utils.ConsoleAndLogPrintf("Deleting duplicate files...")
 	err = ctx.deleteDuplicates(safeMode)
@@ -37,9 +34,6 @@ func (ctx *Context) Zap(safeMode bool) error {
 	if err != nil {
 		return err
 	}
-
-	// This is needed for the progress bar
-	println()
 
 	utils.ConsoleAndLogPrintf("Deleting empty folders...")
 	return ctx.removeEmptyZappedFolders(safeMode)
@@ -70,7 +64,7 @@ func (ctx *Context) moveUniqueFilesToZapFolder(safeMode bool) error {
 		return err
 	}
 
-	utils.ConsoleAndLogPrintf("Moving %s to \"%s\" in %s", utils.Pluralize("file", total), ctx.Config.ZapDataPath, utils.Pluralize("batch", int64(len(batches))))
+	utils.ConsoleAndLogPrintf("Moving %s to \"%s\" in %s", utils.Pluralize("unique file", total), ctx.Config.ZapDataPath, utils.Pluralize("batch", int64(len(batches))))
 
 	bar := progressbar.Default(total)
 
@@ -212,7 +206,7 @@ func (ctx *Context) deleteDuplicates(safeMode bool) error {
 		return nil
 	}
 
-	utils.ConsoleAndLogPrintf("Deleting %s in %s", utils.Pluralize("suplicate file", total), utils.Pluralize("batch", int64(len(batches))))
+	utils.ConsoleAndLogPrintf("Deleting %s in %s", utils.Pluralize("duplicate file", total), utils.Pluralize("batch", int64(len(batches))))
 
 	bar := progressbar.Default(total)
 
