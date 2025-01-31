@@ -12,6 +12,11 @@ func Pluralize(s string, count int64) string {
 		return fmt.Sprintf("1 %s", s)
 	}
 
+	// batches
+	if strings.EqualFold(s, "batch") {
+		s += "e"
+	}
+
 	return fmt.Sprintf("%s %ss", humanize.Comma(count), s)
 }
 
