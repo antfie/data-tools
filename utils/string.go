@@ -12,8 +12,8 @@ func Pluralize(s string, count int64) string {
 		return fmt.Sprintf("1 %s", s)
 	}
 
-	// batches
-	if strings.EqualFold(s, "batch") {
+	// hashes, batches
+	if strings.HasSuffix(strings.ToLower(s), "h") {
 		s += "e"
 	}
 

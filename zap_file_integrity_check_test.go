@@ -30,7 +30,8 @@ func TestZapFileIntegrity(t *testing.T) {
 		DB:     initDb(c),
 	}
 
-	err := ctx.Crawl(path.Join(tempTestDataPath, "a"))
+	dataPath := path.Join(tempTestDataPath, "a")
+	err := ctx.Crawl(dataPath)
 	assert.NoError(t, err)
 
 	err = ctx.HashFiles()
@@ -38,6 +39,10 @@ func TestZapFileIntegrity(t *testing.T) {
 
 	err = ctx.Zap(false)
 	assert.NoError(t, err)
+
+	folderCount, fileCount := getFolderAndFileTotalCount(t, dataPath)
+	assert.Zero(t, folderCount)
+	assert.Zero(t, fileCount)
 
 	err = ctx.ZapDBIntegrityTestBySize()
 	assert.NoError(t, err)

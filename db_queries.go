@@ -66,12 +66,10 @@ LIMIT 		?
 `, fileAbsolutePathCTEQuery)
 }
 
-func QueryGetFileHashesToZapWithLimit() string {
-	return fmt.Sprintf(`
-SELECT		fh.id file_hash_id,
-        	fh.hash,
-    		f.id file_id,
-			%s
+func QueryGetFileIdsToZap() string {
+	return `
+SELECT		f.id,
+			BATCH_NUMBER
 FROM 		file_hashes fh
 JOIN  		(
 				SELECT		f.id,
@@ -85,14 +83,26 @@ JOIN  		(
 WHERE		fh.zapped = 0
 AND			fh.ignored = 0
 ORDER BY	fh.id -- for deterministic result order
-LIMIT 		?
+`
+}
+
+func QueryGetFileHashesToZapMOOO() string {
+	return fmt.Sprintf(`
+SELECT		fh.id file_hash_id,
+        	fh.hash,
+    		f.id file_id,
+			%s
+FROM 		files f
+JOIN  		file_hashes fh ON fh.id = f.file_hash_id
+WHERE 		f.id IN ?
+ORDER BY	f.id -- for deterministic result order
 `, fileAbsolutePathCTEQuery)
 }
 
-func QueryGetDuplicateFilesToZapWithLimit() string {
-	return fmt.Sprintf(`
-SELECT		f.id file_id,
-			%s
+func QueryGetDuplicateFileIdsToRemove() string {
+	return `
+SELECT		f.id,
+			BATCH_NUMBER
 FROM 		files f
 JOIN 		file_hashes fh ON f.file_hash_id = fh.id
 WHERE		f.zapped = 0
@@ -100,8 +110,17 @@ AND			f.deleted_at IS NULL
 AND			f.ignored = 0
 AND			fh.zapped = 1
 AND			fh.ignored = 0
+ORDER BY	f.size DESC -- to remove the largest duplicates first, and for deterministic result order
+`
+}
+
+func QueryGetDuplicateFilesToRemove() string {
+	return fmt.Sprintf(`
+SELECT		f.id file_id,
+			%s
+FROM 		files f
+WHERE		f.id IN ?
 ORDER BY	f.size DESC -- to remove the largest duplicates first, and for deterministic result order 
-LIMIT 		?
 `, fileAbsolutePathCTEQuery)
 }
 

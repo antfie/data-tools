@@ -56,7 +56,7 @@ ORDER BY    id -- for deterministic result order
 	}
 
 	if len(notFoundHashes) > 0 {
-		utils.ConsoleAndLogPrintf("Updating DB with  %d not-found hashes", len(notFoundHashes))
+		utils.ConsoleAndLogPrintf("Updating DB with %s", utils.Pluralize("not-found hash", int64(len(notFoundHashes))))
 
 		// Urgh!
 		// NOTE When update with struct, GORM will only update non-zero fields, you might want to use map to update attributes or use Select to specify fields to update

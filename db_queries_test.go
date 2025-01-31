@@ -31,12 +31,12 @@ func TestGetBatches(t *testing.T) {
 SELECT		id,
 			BATCH_NUMBER
 FROM 		files
-ORDER BY	id`)
+ORDER BY	id`, "")
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, batches)
 	assert.Len(t, batches, 3)
-	assert.Equal(t, 5, total)
+	assert.Equal(t, int64(5), total)
 	assert.Equal(t, []int{1, 2}, batches[0])
 	assert.Equal(t, []int{3, 4}, batches[1])
 	assert.Equal(t, []int{5}, batches[2])

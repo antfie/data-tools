@@ -5,7 +5,6 @@ import (
 	"data-tools/utils"
 	"errors"
 	"fmt"
-	"github.com/dustin/go-humanize"
 	"github.com/schollz/progressbar/v3"
 	"gorm.io/gorm"
 	"log"
@@ -22,28 +21,28 @@ type ZapResult struct {
 }
 
 func (ctx *Context) Zap(safeMode bool) error {
+	utils.ConsoleAndLogPrintf("Moving unique files to ZAP folder...")
 	err := ctx.moveUniqueFilesToZapFolder(safeMode)
 
 	if err != nil {
 		return err
 	}
+	
+	// This is needed for the progress bar
+	println()
 
-	return nil
+	utils.ConsoleAndLogPrintf("Deleting duplicate files...")
+	err = ctx.deleteDuplicates(safeMode)
 
-	//
-	//// This is needed for the progress bar
-	//println()
-	//
-	//err = ctx.removeDuplicates(safeMode)
-	//
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//// This is needed for the progress bar
-	//println()
-	//
-	//return ctx.removeEmptyZappedFolders(safeMode)
+	if err != nil {
+		return err
+	}
+
+	// This is needed for the progress bar
+	println()
+
+	utils.ConsoleAndLogPrintf("Deleting empty folders...")
+	return ctx.removeEmptyZappedFolders(safeMode)
 }
 
 func (ctx *Context) moveUniqueFilesToZapFolder(safeMode bool) error {
@@ -200,41 +199,29 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 	orchestrator.FinishTask()
 }
 
-func (ctx *Context) removeDuplicates(safeMode bool) error {
-	type ZapInfo struct {
-		CountOfFilesToRemove  int64
-		TotalFileSizeToRemove uint64
+func (ctx *Context) deleteDuplicates(safeMode bool) error {
+	utils.ConsoleAndLogPrintf("Acquiring data...")
+	total, batches, err := ctx.GetBatchesOfIDs(QueryGetDuplicateFileIdsToRemove(), "f")
+
+	if err != nil {
+		return err
 	}
 
-	var info ZapInfo
-	result := ctx.DB.Raw(`
-SELECT		COUNT(*) count_of_files_to_remove,
-			SUM(f.size) total_file_size_to_remove
-FROM 		files f
-JOIN 		file_hashes fh ON f.file_hash_id = fh.id
-WHERE		f.zapped = 0
-AND			f.deleted_at IS NULL
-AND			f.ignored = 0
-AND			fh.zapped = 1
-AND			fh.ignored = 0
-`).First(&info)
+	if len(batches) == 0 {
+		utils.ConsoleAndLogPrintf("No duplicate files to remove.")
+		return nil
+	}
 
-	utils.ConsoleAndLogPrintf("Removing %s (%s)", utils.Pluralize("duplicate file", info.CountOfFilesToRemove), humanize.Bytes(info.TotalFileSizeToRemove))
+	utils.ConsoleAndLogPrintf("Deleting %s in %s", utils.Pluralize("suplicate file", total), utils.Pluralize("batch", int64(len(batches))))
 
-	bar := progressbar.Default(info.CountOfFilesToRemove)
+	bar := progressbar.Default(total)
 
-	// Do batches until there are no more
-	for {
+	for _, batch := range batches {
 		var duplicateFilesToRemove []FileIdAndPath
-		result = ctx.DB.Raw(QueryGetDuplicateFilesToZapWithLimit(), ctx.Config.BatchSize).Scan(&duplicateFilesToRemove)
+		result := ctx.DB.Raw(QueryGetDuplicateFilesToRemove(), batch).Scan(&duplicateFilesToRemove)
 
 		if result.Error != nil {
 			return result.Error
-		}
-
-		// Have we finished?
-		if len(duplicateFilesToRemove) == 0 {
-			return nil
 		}
 
 		orchestrator := utils.NewTaskOrchestrator(bar, len(duplicateFilesToRemove), ctx.Config.MaxConcurrentFileOperations)
@@ -244,12 +231,12 @@ AND			fh.ignored = 0
 
 		for _, file := range duplicateFilesToRemove {
 			orchestrator.StartTask()
-			go ctx.removeDuplicateFile(orchestrator, safeMode, file, &zappedFileIds, &notFoundFileIDs)
+			go ctx.deleteDuplicateFile(orchestrator, safeMode, file, &zappedFileIds, &notFoundFileIDs)
 		}
 
 		orchestrator.WaitForTasks()
 
-		err := ctx.DB.Transaction(func(tx *gorm.DB) error {
+		transactionErr := ctx.DB.Transaction(func(tx *gorm.DB) error {
 			zapFileError := zapFilesInDB(tx, zappedFileIds)
 
 			if zapFileError != nil {
@@ -259,13 +246,15 @@ AND			fh.ignored = 0
 			return DealWithNotFoundFiles(tx, notFoundFileIDs)
 		})
 
-		if err != nil {
-			log.Fatalf("DB Error: %v", err)
+		if transactionErr != nil {
+			return transactionErr
 		}
 	}
+
+	return nil
 }
 
-func (ctx *Context) removeDuplicateFile(orchestrator *utils.TaskOrchestrator, safeMode bool, file FileIdAndPath, zappedFileIds, notFoundFileIDs *[]uint) {
+func (ctx *Context) deleteDuplicateFile(orchestrator *utils.TaskOrchestrator, safeMode bool, file FileIdAndPath, zappedFileIds, notFoundFileIDs *[]uint) {
 	// If the file does not exist we can ignore it
 	if !IsFile(file.AbsolutePath) {
 		orchestrator.Lock()
