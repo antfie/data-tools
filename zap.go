@@ -35,7 +35,6 @@ func (ctx *Context) Zap(safeMode bool) error {
 		return err
 	}
 
-	utils.ConsoleAndLogPrintf("Deleting empty folders...")
 	return ctx.removeEmptyZappedFolders(safeMode)
 }
 
@@ -276,7 +275,7 @@ func (ctx *Context) deleteDuplicateFile(orchestrator *utils.TaskOrchestrator, sa
 }
 
 func (ctx *Context) removeEmptyZappedFolders(safeMode bool) error {
-	utils.ConsoleAndLogPrintf("Removing empty folders")
+	utils.ConsoleAndLogPrintf("Deleting empty folders...")
 
 	var filesToProcess []string
 	var foldersToProcess []string
