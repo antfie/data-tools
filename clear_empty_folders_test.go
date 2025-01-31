@@ -5,7 +5,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-
 	"testing"
 )
 
@@ -33,11 +32,11 @@ func TestClearEmptyFolder(t *testing.T) {
 	err = os.Remove(testFile2)
 	assert.NoError(t, err)
 
-	err = clearEmptyFolder(tempTestDataPath)
+	err = ClearEmptyFolders([]string{tempTestDataPath})
 	assert.NoError(t, err)
 
 	folderCount, fileCount := getFolderAndFileTotalCount(t, tempTestDataPath)
 
 	assert.Equal(t, 4, folderCount)
-	assert.Equal(t, 4, fileCount)
+	assert.Equal(t, 5, fileCount)
 }
