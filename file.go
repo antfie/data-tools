@@ -1,7 +1,6 @@
 package main
 
 import (
-	"data-tools/utils"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -81,31 +80,6 @@ func getPathsForMkdirs(filePaths []string) []string {
 
 		if !found {
 			resolvedPaths = append(resolvedPaths, basePath)
-		}
-	}
-
-	return resolvedPaths
-}
-
-func getPathsForRMDir(filePaths []string) []string {
-	var resolvedPaths []string
-
-	sortFilePathsByShortest(filePaths)
-
-	for _, filePath := range filePaths {
-		basePath := filepath.Dir(filePath)
-		found := false
-		for _, existingPath := range resolvedPaths {
-			if !strings.HasPrefix(existingPath, basePath) {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			if !utils.IsInArray(basePath, resolvedPaths) {
-				resolvedPaths = append(resolvedPaths, basePath)
-			}
 		}
 	}
 

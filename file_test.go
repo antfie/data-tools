@@ -28,15 +28,3 @@ func TestGetPathsForMkdirs(t *testing.T) {
 
 	assert.ElementsMatch(t, expected, result)
 }
-
-func TestGetPathsForRMDir(t *testing.T) {
-	result := getPathsForRMDir(pathForInputs)
-
-	var expected = []string{
-		"/j/foo/bar/a",
-		"/j/foo/bar/y",
-		"/j/c",
-	}
-
-	assert.ElementsMatch(t, expected, result)
-}
