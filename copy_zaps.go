@@ -4,6 +4,7 @@ import (
 	"data-tools/utils"
 	"fmt"
 	"github.com/schollz/progressbar/v3"
+	"log"
 	"os"
 
 	"path"
@@ -74,7 +75,7 @@ func copyZapsInFolder(orchestrator *utils.TaskOrchestrator, sourcePath, destinat
 	err := CopyOrMoveFiles(sourcePath, destinationPath, true, true)
 
 	if err != nil {
-		//return err
+		log.Print(err)
 	}
 
 	orchestrator.FinishTask()

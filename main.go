@@ -55,7 +55,10 @@ func main() {
 		return
 	}
 
-	err = ctx.runCommand(strings.ToLower(os.Args[1]))
+	command := os.Args[1]
+	utils.ConsoleAndLogPrintf("Running command: %s", command)
+
+	err = ctx.runCommand(strings.ToLower(command))
 
 	if err != nil {
 		utils.ConsoleAndLogPrintf("Error: %v", err)
@@ -78,7 +81,6 @@ func sanityCheckOSRequirements() {
 			log.Fatalf("Error: Could not find required \"%s\" executable", requiredProgram)
 		}
 	}
-
 }
 
 func (ctx *Context) runCommand(command string) error {

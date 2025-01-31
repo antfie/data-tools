@@ -2,8 +2,6 @@ package main
 
 import (
 	"data-tools/utils"
-	"encoding/hex"
-	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/dustin/go-humanize"
 	"github.com/schollz/progressbar/v3"
 	"log"
@@ -113,8 +111,8 @@ func createFolders(destinationAbsolutePath string, fileHashesToUnZap []ZapResult
 }
 
 func (ctx *Context) unZapFile(orchestrator *utils.TaskOrchestrator, processedFileIds *[]uint, zapSourcePath, destinationAbsolutePath string, file *ZapResult, notFoundFileIDs *[]uint) {
-	hexFileName := hex.EncodeToString(base58.Decode(file.Hash))
-	sourceFilePath := path.Join(zapSourcePath, hexFileName)
+	hexFileName := DecodeHash(file.Hash)
+	sourceFilePath := path.Join(zapSourcePath, FormatRelativeZapFilePathFromHash(hexFileName))
 
 	// If the file does not exist we can ignore it
 	if !IsFile(sourceFilePath) {

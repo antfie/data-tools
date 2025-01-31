@@ -98,6 +98,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 		}
 
 		// We do this here as there is no point in creating a structure if there is nothing to hash (i.e. calling this earlier)
+		// We only do this once per run.
 		if !zapStructureCreated {
 			err = createZapDirectoryStructure(outputPathAbs)
 
@@ -120,7 +121,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 		orchestrator.WaitForTasks()
 
-		err = ctx.DB.Transaction(func(tx *gorm.DB) error {
+		return ctx.DB.Transaction(func(tx *gorm.DB) error {
 			if len(zappedFileHashIds) > 0 {
 				result = tx.Where("id IN ?", zappedFileHashIds).Updates(models.FileHash{
 					Zapped: true,
@@ -135,18 +136,16 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 				}
 			}
 
-			zapFileError := zapFilesInDB(tx, zappedFileIds)
+			if len(zappedFileIds) > 0 {
+				zapFileError := zapFilesInDB(tx, zappedFileIds)
 
-			if zapFileError != nil {
-				return zapFileError
+				if zapFileError != nil {
+					return zapFileError
+				}
 			}
 
 			return DealWithNotFoundFiles(tx, notFoundFileIDs)
 		})
-
-		if err != nil {
-			log.Fatalf("DB Error: %v", err)
-		}
 	}
 }
 
@@ -196,14 +195,14 @@ func (ctx *Context) zapFile(orchestrator *utils.TaskOrchestrator, safeMode bool,
 		return
 	}
 
-	// Store as hex so it will work OK on case-insensitive filesystems
-	hexFileName := hex.EncodeToString(base58.Decode(file.Hash))
+	// Store as hex so this will work fine on case-insensitive filesystems
+	hexFileName := DecodeHash(file.Hash)
+	destinationPath := path.Join(zapBasePath, FormatRelativeZapFilePathFromHash(hexFileName))
 
 	// Only move if not in safe mode
 	move := !safeMode
 
 	// ZAP
-	destinationPath := path.Join(zapBasePath, hexFileName[:2], hexFileName[2:4], hexFileName[4:])
 	success, err := CopyOrMoveFile(file.AbsolutePath, destinationPath, move, true)
 
 	if err != nil {

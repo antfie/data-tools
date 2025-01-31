@@ -2,6 +2,7 @@ package main
 
 import (
 	"data-tools/models"
+	"data-tools/utils"
 	"errors"
 	"log"
 	"os"
@@ -15,6 +16,8 @@ import (
 
 func (ctx *Context) ZapDBIntegrityTestBySize() error {
 	hashes := make(map[string]int64)
+
+	utils.ConsoleAndLogPrintf("Acquiring data")
 
 	// Execute the raw SQL query
 	rows, err := ctx.DB.Raw(`
@@ -45,6 +48,7 @@ ORDER BY    id -- for deterministic result order
 		return err
 	}
 
+	utils.ConsoleAndLogPrintf("Checking %d hashes", len(hashes))
 	notFoundHashes, err := AssertHashesInZapPath(ctx.Config.ZapDataPath, hashes)
 
 	if err != nil {
@@ -52,6 +56,8 @@ ORDER BY    id -- for deterministic result order
 	}
 
 	if len(notFoundHashes) > 0 {
+		utils.ConsoleAndLogPrintf("Updating DB with  %d not-found hashes", len(notFoundHashes))
+
 		// Urgh!
 		// NOTE When update with struct, GORM will only update non-zero fields, you might want to use map to update attributes or use Select to specify fields to update
 		// - https://gorm.io/docs/update.html#Updates-multiple-columns
@@ -74,19 +80,27 @@ func AssertHashesInZapPath(zapPath string, hashes map[string]int64) ([]string, e
 	var notFoundHashes []string
 
 	for hash, size := range hashes {
-		filePath := path.Join(zapPath, FormatRelativeZapFilePathFromEncodedHash(hash))
+		hexFileName := DecodeHash(hash)
+		filePath := path.Join(zapPath, FormatRelativeZapFilePathFromHash(hexFileName))
 
 		stat, err := os.Stat(filePath)
 
 		if os.IsNotExist(err) {
-			log.Printf("Hash not found in ZAP folder: %s", hash)
+			log.Printf("Hash not found in ZAP folder: %s", hexFileName)
 			notFoundHashes = append(notFoundHashes, hash)
+			continue
 		} else if err != nil {
 			return nil, err
 		}
 
+		if stat == nil {
+			log.Printf("Stat is nil: %s", hexFileName)
+			notFoundHashes = append(notFoundHashes, hash)
+			continue
+		}
+
 		if stat.Size() != size {
-			log.Printf("Hash size mismatch: expected %d, got %d for hash %s", size, stat.Size(), hash)
+			log.Printf("Hash size mismatch: expected %d, got %d for hash %s", size, stat.Size(), hexFileName)
 			notFoundHashes = append(notFoundHashes, hash)
 		}
 	}

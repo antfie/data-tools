@@ -4,6 +4,7 @@ import (
 	"data-tools/crypto"
 	"data-tools/models"
 	"data-tools/utils"
+	"errors"
 	"github.com/dustin/go-humanize"
 	"github.com/schollz/progressbar/v3"
 	"gorm.io/gorm"
@@ -161,18 +162,14 @@ func (ctx *Context) HashFiles() error {
 					if fileUpdateResult.Error != nil {
 						return fileUpdateResult.Error
 					}
+
+					if fileUpdateResult.RowsAffected != 1 {
+						return errors.New("failed to update hash signature")
+					}
 				}
 			}
 
-			if len(notFoundFileIDs) > 0 {
-				deleteNotFoundResult := tx.Where("id IN ?", notFoundFileIDs).Delete(&models.File{})
-
-				if deleteNotFoundResult.Error != nil {
-					return deleteNotFoundResult.Error
-				}
-			}
-
-			return nil
+			return DealWithNotFoundFiles(tx, notFoundFileIDs)
 		})
 
 		if err != nil {

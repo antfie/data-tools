@@ -60,3 +60,12 @@ func getFolderAndFileTotalCount(t *testing.T, path string) (int, int) {
 	assert.NoError(t, err)
 	return folderCount, fileCount
 }
+
+func (ctx *Context) AssertDBCount(t *testing.T, query string, expectedCount int) {
+	var countResult int
+	result := ctx.DB.Raw(query).First(&countResult)
+
+	assert.NoError(t, result.Error)
+	assert.Equal(t, int64(1), result.RowsAffected)
+	assert.Equal(t, expectedCount, countResult)
+}

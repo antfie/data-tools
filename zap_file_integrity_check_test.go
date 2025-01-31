@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package main
 
 import (
@@ -8,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestIntegrationZapFileIntegrity(t *testing.T) {
+func TestZapFileIntegrity(t *testing.T) {
 	tempTestDataPath := createTempTestDataPath(t)
 	defer os.RemoveAll(tempTestDataPath)
 
@@ -39,6 +42,8 @@ func TestIntegrationZapFileIntegrity(t *testing.T) {
 	err = ctx.ZapDBIntegrityTestBySize()
 	assert.NoError(t, err)
 
+	ctx.AssertDBCount(t, "SELECT COUNT(*) FROM file_hashes WHERE zapped = 1", 3)
+
 	// Corrupt a file
 	zappedFilePath := path.Join(zapDatapath, "4f/57/8179952b85b92c2b464c64fabc6134fa0fa9692c8333cbe1c48cf6eeb9bc89b4f91338681a12f377b6cda17643ae3b4a18849f99f20ab7b7873dc95b3355")
 	assert.True(t, IsFile(zappedFilePath))
@@ -55,4 +60,6 @@ func TestIntegrationZapFileIntegrity(t *testing.T) {
 
 	err = ctx.ZapDBIntegrityTestBySize()
 	assert.NoError(t, err)
+
+	ctx.AssertDBCount(t, "SELECT COUNT(*) FROM file_hashes WHERE zapped = 1", 1)
 }

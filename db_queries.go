@@ -1,6 +1,11 @@
 package main
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 const fileAbsolutePathCTEQuery = `
 (
@@ -156,4 +161,51 @@ SELECT		id,
 FROM		file_types
 ORDER BY	id -- for deterministic result order
 `
+}
+
+func (ctx *Context) GetBatchesOfIDs(query string) (int, [][]int, error) {
+	total := 0
+	var output [][]int
+	var batches []string
+
+	if !strings.Contains(query, "BATCH_NUMBER") {
+		return 0, nil, errors.New("missing BATCH_NUMBER placeholder in query")
+	}
+
+	formattedBatchSize := fmt.Sprintf("(ROW_NUMBER() OVER (ORDER BY id) - 1) / %d AS batch_number", ctx.Config.BatchSize)
+	formattedQuery := strings.Replace(query, "BATCH_NUMBER", formattedBatchSize, 1)
+
+	result := ctx.DB.Raw(fmt.Sprintf(`
+WITH NumberedRows AS (
+	%s
+)
+SELECT
+    GROUP_CONCAT(id) AS ids
+FROM NumberedRows
+GROUP BY batch_number
+ORDER BY batch_number
+`, formattedQuery)).Scan(&batches)
+
+	if result.Error != nil {
+		return 0, nil, result.Error
+	}
+
+	for _, batch := range batches {
+		var ids []int
+
+		for _, id := range strings.Split(batch, ",") {
+			total++
+			idAsInt, err := strconv.Atoi(id)
+
+			if err != nil {
+				return 0, nil, err
+			}
+
+			ids = append(ids, idAsInt)
+		}
+
+		output = append(output, ids)
+	}
+
+	return total, output, nil
 }
