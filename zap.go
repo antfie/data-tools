@@ -3,10 +3,8 @@ package main
 import (
 	"data-tools/models"
 	"data-tools/utils"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/dustin/go-humanize"
 	"github.com/schollz/progressbar/v3"
 	"gorm.io/gorm"
@@ -24,88 +22,65 @@ type ZapResult struct {
 }
 
 func (ctx *Context) Zap(safeMode bool) error {
-	err := ctx.copyDeduplicatedFiles(ctx.Config.ZapDataPath, safeMode)
+	err := ctx.moveUniqueFilesToZapFolder(safeMode)
 
 	if err != nil {
 		return err
 	}
 
-	// This is needed for the progress bar
-	println()
+	return nil
 
-	err = ctx.removeDuplicates(safeMode)
-
-	if err != nil {
-		return err
-	}
-
-	// This is needed for the progress bar
-	println()
-
-	return ctx.removeEmptyZappedFolders(safeMode)
+	//
+	//// This is needed for the progress bar
+	//println()
+	//
+	//err = ctx.removeDuplicates(safeMode)
+	//
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//// This is needed for the progress bar
+	//println()
+	//
+	//return ctx.removeEmptyZappedFolders(safeMode)
 }
 
-func (ctx *Context) copyDeduplicatedFiles(outputPath string, safeMode bool) error {
-	type ZapInfo struct {
-		FileHashesToZap         int64
-		UniqueHashTotalFileSize uint64
-		TotalFileSize           uint64
+func (ctx *Context) moveUniqueFilesToZapFolder(safeMode bool) error {
+	utils.ConsoleAndLogPrintf("Acquiring data...")
+	total, batches, err := ctx.GetBatchesOfIDs(QueryGetFileIdsToZap(), "f")
+
+	if err != nil {
+		return err
 	}
 
-	var info ZapInfo
-	result := ctx.DB.Raw(`
-SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 AND zapped = 0) file_hashes_to_zap,
-       (SELECT SUM(size) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 AND zapped = 0) unique_hash_total_file_size,
-       (SELECT SUM(size) FROM files WHERE deleted_at IS NULL AND size IS NOT NULL AND ignored = 0 AND zapped = 0) total_file_size
-`).First(&info)
-
-	if result.Error != nil {
-		return result.Error
-	}
-
-	// Nothing to do
-	if info.FileHashesToZap == 0 {
-		utils.ConsoleAndLogPrintf("No files to ZAP. Have you already sized?")
+	if len(batches) == 0 {
+		utils.ConsoleAndLogPrintf("No files to ZAP. Have you already hashed?")
 		return nil
 	}
 
-	outputPathAbs, err := filepath.Abs(outputPath)
+	outputPathAbs, err := filepath.Abs(ctx.Config.ZapDataPath)
 
 	if err != nil {
 		return err
 	}
 
-	remainingPercentage := (float64(info.TotalFileSize-info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
-	removalPercentage := (float64(info.UniqueHashTotalFileSize) / float64(info.TotalFileSize)) * 100
-	utils.ConsoleAndLogPrintf("Moving %s (%s) to \"%s\". This is %.2f%% of %s, a reduction of %s (%.2f%%)", utils.Pluralize("de-duplicated file", info.FileHashesToZap), humanize.Bytes(info.TotalFileSize-info.UniqueHashTotalFileSize), outputPathAbs, remainingPercentage, humanize.Bytes(info.TotalFileSize), humanize.Bytes(info.TotalFileSize-(info.TotalFileSize-info.UniqueHashTotalFileSize)), removalPercentage)
+	err = createZapDirectoryStructure(outputPathAbs)
 
-	bar := progressbar.Default(info.FileHashesToZap)
+	if err != nil {
+		return err
+	}
 
-	zapStructureCreated := false
+	utils.ConsoleAndLogPrintf("Moving %s to \"%s\" in %s", utils.Pluralize("file", total), ctx.Config.ZapDataPath, utils.Pluralize("batch", int64(len(batches))))
 
-	// Do batches until there are no more
-	for {
+	bar := progressbar.Default(total)
+
+	for _, batch := range batches {
 		var fileHashesToZap []ZapResult
-		result = ctx.DB.Raw(QueryGetFileHashesToZapWithLimit(), ctx.Config.BatchSize).Scan(&fileHashesToZap)
+		result := ctx.DB.Raw(QueryGetFileHashesToZapMOOO(), batch).Scan(&fileHashesToZap)
 
 		if result.Error != nil {
 			return result.Error
-		}
-
-		// Have we finished?
-		if len(fileHashesToZap) == 0 {
-			return nil
-		}
-
-		// We do this here as there is no point in creating a structure if there is nothing to hash (i.e. calling this earlier)
-		// We only do this once per run.
-		if !zapStructureCreated {
-			err = createZapDirectoryStructure(outputPathAbs)
-
-			if err != nil {
-				return err
-			}
-			zapStructureCreated = true
 		}
 
 		var zappedFileHashIds []uint
@@ -121,7 +96,7 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 		orchestrator.WaitForTasks()
 
-		return ctx.DB.Transaction(func(tx *gorm.DB) error {
+		transactionErr := ctx.DB.Transaction(func(tx *gorm.DB) error {
 			if len(zappedFileHashIds) > 0 {
 				result = tx.Where("id IN ?", zappedFileHashIds).Updates(models.FileHash{
 					Zapped: true,
@@ -146,7 +121,13 @@ SELECT (SELECT COUNT(*) FROM file_hashes WHERE size IS NOT NULL AND ignored = 0 
 
 			return DealWithNotFoundFiles(tx, notFoundFileIDs)
 		})
+
+		if transactionErr != nil {
+			return transactionErr
+		}
 	}
+
+	return nil
 }
 
 func zapFilesInDB(tx *gorm.DB, zappedFileIds []uint) error {
