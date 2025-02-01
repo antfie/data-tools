@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"log"
 	"os"
@@ -110,9 +111,19 @@ func osCopy(source, destination string) error {
 }
 
 func debuggableExecution(cmd *exec.Cmd) error {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
 	err := cmd.Run()
 
 	if err != nil {
+		stdoutStr := stdout.String()
+		stderrStr := stderr.String()
+
+		log.Print(stdoutStr, stderrStr, err)
 		return err
 	}
 
