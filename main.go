@@ -111,6 +111,7 @@ func (ctx *Context) runCommand(command string) error {
 		if len(os.Args) != 4 {
 			log.Fatal("merge_zaps requires source and destination paths.")
 		}
+
 		return MergeZaps(os.Args[2], os.Args[3])
 
 	case "clear_empty_folders":
@@ -139,7 +140,7 @@ func (ctx *Context) runCommand(command string) error {
 		hash, err := crypto.HashFile(filePath)
 
 		if err != nil {
-			log.Printf("Error: Could not hash file \"%s\": %v", filePath, err)
+			utils.ConsoleAndLogPrintf("Error: Could not hash file \"%s\": %v", filePath, err)
 			return err
 		}
 
