@@ -2,6 +2,7 @@ package main
 
 import (
 	"data-tools/config"
+	"data-tools/crypto"
 	"data-tools/utils"
 	_ "embed"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"github.com/dustin/go-humanize"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -16,7 +18,7 @@ import (
 //goland:noinspection GoUnnecessarilyExportedIdentifiers
 var AppVersion = "6.0"
 
-var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  crawl\n  hash\n  zap\n  unzap\n  merge_zaps\n  clear_empty_folders\n  integrity\n"
+var usageText = "Usage: ./data-tools command.\nAvailable commands:\n  crawl\n  hash\n  zap\n  unzap\n  merge_zaps\n  clear_empty_folders\n  integrity\n  hash_file\n"
 
 //go:embed config.yaml
 var defaultConfigData []byte
@@ -120,6 +122,29 @@ func (ctx *Context) runCommand(command string) error {
 
 	case "integrity":
 		return ctx.ZapDBIntegrityTestBySize()
+
+	case "hash_file":
+		if len(os.Args) != 3 {
+			log.Fatal("hash_file requires a file path.")
+		}
+
+		filePath, err := filepath.Abs(os.Args[2])
+
+		if err != nil {
+			return err
+		}
+
+		utils.ConsoleAndLogPrintf("Hashing \"%s\"", filePath)
+
+		hash, err := crypto.HashFile(filePath)
+
+		if err != nil {
+			log.Printf("Error: Could not hash file \"%s\": %v", filePath, err)
+			return err
+		}
+
+		utils.ConsoleAndLogPrintf("Hash of \"%s\" is %s (%s)", filePath, hash, DecodeHash(hash))
+		return nil
 	}
 
 	return errors.New(fmt.Sprintf("Command \"%s\" not recognised. %s", command, usageText))
