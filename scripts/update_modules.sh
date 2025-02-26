@@ -15,5 +15,4 @@ go get -u ./...
 go mod download
 go mod tidy
 
-
 echo -e "\n${GREEN}Update successful${NC}"
