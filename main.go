@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/dustin/go-humanize"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -50,23 +51,30 @@ func main() {
 	}
 
 	utils.ConsoleAndLogPrintf("Data Tools version %s%s. Using %s for file operations and batches of %s", AppVersion, debugFormat, utils.Pluralize("thread", ctx.Config.MaxConcurrentFileOperations), humanize.Comma(ctx.Config.BatchSize))
-	startTime := time.Now()
 
 	if len(os.Args) < 2 {
 		utils.ConsoleAndLogPrintf(fmt.Sprintf("A command must be specified. %s", usageText))
 		return
 	}
 
-	command := os.Args[1]
+	command := strings.ToLower(os.Args[1])
 	utils.ConsoleAndLogPrintf("Running command: %s", command)
 
-	err = ctx.runCommand(strings.ToLower(command))
+	startTime := time.Now()
+	err = ctx.runCommand(command)
 
 	if err != nil {
 		utils.ConsoleAndLogPrintf("Error: %v", err)
 	}
 
-	utils.ConsoleAndLogPrintf("Finished in %s", utils.FormatDuration(time.Since(startTime)))
+	duration := math.Round(time.Since(startTime).Seconds())
+	formattedDuration := fmt.Sprintf("%.0f second", duration)
+
+	if duration != 1 {
+		formattedDuration += "s"
+	}
+
+	utils.ConsoleAndLogPrintf("Finished in %s", formattedDuration)
 }
 
 func sanityCheckOSRequirements() {
